@@ -491,15 +491,28 @@ async def get_swipes(user_id: str):
     return [SwipeRecord(**swipe) for swipe in swipes]
 
 # Outfits Routes
-@api_router.get("/outfits", response_model=List[Outfit])
-async def get_outfits(skip: int = 0, limit: int = 20):
-    return MOCK_OUTFITS[skip:skip+limit]
+@api_router.get("/outfits")
+async def get_outfits(skip: int = 0, limit: int = 20, gender: Optional[str] = None):
+    """Get outfits filtered by gender. 
+    - gender='male': returns men's outfits
+    - gender='female': returns women's outfits  
+    - gender='non-binary' or None: returns all outfits
+    """
+    if gender == "male":
+        outfits = MEN_OUTFITS
+    elif gender == "female":
+        outfits = WOMEN_OUTFITS
+    else:
+        # For non-binary or when no gender specified, show all
+        outfits = ALL_OUTFITS
+    
+    return outfits[skip:skip+limit]
 
-@api_router.get("/outfits/{outfit_id}", response_model=Outfit)
+@api_router.get("/outfits/{outfit_id}")
 async def get_outfit(outfit_id: str):
-    for outfit in MOCK_OUTFITS:
+    for outfit in ALL_OUTFITS:
         if outfit["id"] == outfit_id:
-            return Outfit(**outfit)
+            return outfit
     raise HTTPException(status_code=404, detail="Outfit not found")
 
 # AI Analysis Routes
