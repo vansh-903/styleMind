@@ -4,17 +4,16 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Animated,
   Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { COLORS, SPACING, RADIUS } from '../constants/theme';
-import { useAppStore } from '../store/appStore';
+import { COLORS, SPACING, RADIUS } from '../src/constants/theme';
+import { useAppStore } from '../src/store/appStore';
 import axios from 'axios';
-import { API_ENDPOINTS } from '../constants/api';
+import { API_ENDPOINTS } from '../src/constants/api';
 
 const { width } = Dimensions.get('window');
 

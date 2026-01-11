@@ -8,11 +8,10 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { COLORS, SPACING, RADIUS } from '../constants/theme';
-import { useAppStore } from '../store/appStore';
+import { COLORS, SPACING, RADIUS } from '../src/constants/theme';
+import { useAppStore } from '../src/store/appStore';
 
 const { width } = Dimensions.get('window');
 
