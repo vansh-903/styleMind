@@ -143,104 +143,235 @@ class OutfitSuggestionRequest(BaseModel):
 
 # ==================== MOCK DATA ====================
 
-MOCK_OUTFITS = [
+# Women's Outfits
+WOMEN_OUTFITS = [
     {
-        "id": "outfit_001",
-        "name": "Casual Summer Vibes",
-        "image_url": "https://images.unsplash.com/photo-1523398002811-999ca8dec234?w=600",
-        "tags": ["Casual", "Summer", "Relaxed"],
-        "style_category": "casual_chic",
-        "items": [{"type": "top", "name": "Linen Shirt", "color": "White"}, {"type": "bottom", "name": "Chino Shorts", "color": "Beige"}]
-    },
-    {
-        "id": "outfit_002",
-        "name": "Street Style Urban",
-        "image_url": "https://images.unsplash.com/photo-1590330297626-d7aff25a0431?w=600",
-        "tags": ["Street", "Urban", "Bold"],
-        "style_category": "streetwear",
-        "items": [{"type": "top", "name": "Graphic Tee", "color": "Black"}, {"type": "bottom", "name": "Cargo Pants", "color": "Olive"}]
-    },
-    {
-        "id": "outfit_003",
-        "name": "Elegant Evening",
+        "id": "w_outfit_001",
+        "name": "Elegant Evening Dress",
         "image_url": "https://images.unsplash.com/photo-1624911104820-5316c700b907?w=600",
         "tags": ["Elegant", "Evening", "Sophisticated"],
         "style_category": "classic",
+        "gender": "female",
         "items": [{"type": "dress", "name": "White Dress", "color": "White"}]
     },
     {
-        "id": "outfit_004",
-        "name": "Boho Chic",
+        "id": "w_outfit_002",
+        "name": "Boho Chic Maxi",
         "image_url": "https://images.unsplash.com/photo-1622122201640-3b34a4a49444?w=600",
         "tags": ["Boho", "Floral", "Free-spirited"],
         "style_category": "bohemian",
+        "gender": "female",
         "items": [{"type": "dress", "name": "Floral Maxi", "color": "Multi"}]
     },
     {
-        "id": "outfit_005",
-        "name": "Minimalist Modern",
-        "image_url": "https://images.unsplash.com/photo-1624223237138-21a37e61dec0?w=600",
-        "tags": ["Minimal", "Clean", "Modern"],
-        "style_category": "minimalist",
-        "items": [{"type": "top", "name": "Basic Tee", "color": "Grey"}, {"type": "bottom", "name": "Slim Jeans", "color": "Blue"}]
-    },
-    {
-        "id": "outfit_006",
-        "name": "Edgy Rocker",
-        "image_url": "https://images.pexels.com/photos/1895943/pexels-photo-1895943.jpeg?w=600",
-        "tags": ["Edgy", "Rock", "Bold"],
-        "style_category": "edgy",
-        "items": [{"type": "jacket", "name": "Leather Jacket", "color": "Black"}, {"type": "bottom", "name": "Ripped Jeans", "color": "Black"}]
-    },
-    {
-        "id": "outfit_007",
-        "name": "Traditional Ethnic",
-        "image_url": "https://images.unsplash.com/photo-1739773375441-e8ded0ce3605?w=600",
-        "tags": ["Ethnic", "Traditional", "Festive"],
-        "style_category": "classic",
-        "items": [{"type": "kurta", "name": "Yellow Kurta", "color": "Yellow"}]
-    },
-    {
-        "id": "outfit_008",
+        "id": "w_outfit_003",
         "name": "Trendy Stripes",
-        "image_url": "https://images.unsplash.com/photo-1739773375456-79be292cedb1?w=600",
+        "image_url": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600",
         "tags": ["Trendy", "Stripes", "Fun"],
         "style_category": "casual_chic",
-        "items": [{"type": "dress", "name": "Striped Dress", "color": "Yellow/Pink"}]
+        "gender": "female",
+        "items": [{"type": "dress", "name": "Striped Dress", "color": "Multi"}]
     },
     {
-        "id": "outfit_009",
-        "name": "Chic Pink",
-        "image_url": "https://images.unsplash.com/photo-1739773375403-36a4ba177f73?w=600",
+        "id": "w_outfit_004",
+        "name": "Chic Pink Look",
+        "image_url": "https://images.unsplash.com/photo-1581044777550-4cfa60707c03?w=600",
         "tags": ["Chic", "Pink", "Feminine"],
         "style_category": "casual_chic",
-        "items": [{"type": "dress", "name": "Pink Dress", "color": "Pink"}]
+        "gender": "female",
+        "items": [{"type": "outfit", "name": "Pink Ensemble", "color": "Pink"}]
     },
     {
-        "id": "outfit_010",
-        "name": "Stylish Duo",
-        "image_url": "https://images.unsplash.com/photo-1762343292182-b0cb71a19111?w=600",
-        "tags": ["Stylish", "Trendy", "Bold"],
-        "style_category": "streetwear",
-        "items": [{"type": "outfit", "name": "Trendy Ensemble", "color": "Mixed"}]
-    },
-    {
-        "id": "outfit_011",
-        "name": "Modern Minimalist",
-        "image_url": "https://images.unsplash.com/photo-1763750781876-d99c552c891c?w=600",
-        "tags": ["Modern", "Minimal", "Sleek"],
-        "style_category": "minimalist",
-        "items": [{"type": "top", "name": "Clean Cut Top", "color": "Black/White"}]
-    },
-    {
-        "id": "outfit_012",
-        "name": "Professional Casual",
-        "image_url": "https://images.pexels.com/photos/923229/pexels-photo-923229.jpeg?w=600",
-        "tags": ["Professional", "Smart", "Casual"],
+        "id": "w_outfit_005",
+        "name": "Power Suit",
+        "image_url": "https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=600",
+        "tags": ["Professional", "Power", "Chic"],
         "style_category": "classic",
-        "items": [{"type": "top", "name": "Blazer", "color": "Navy"}, {"type": "bottom", "name": "Chinos", "color": "Tan"}]
+        "gender": "female",
+        "items": [{"type": "suit", "name": "Blazer Set", "color": "Black"}]
+    },
+    {
+        "id": "w_outfit_006",
+        "name": "Casual Denim",
+        "image_url": "https://images.unsplash.com/photo-1509631179647-0177331693ae?w=600",
+        "tags": ["Casual", "Denim", "Relaxed"],
+        "style_category": "casual_chic",
+        "gender": "female",
+        "items": [{"type": "top", "name": "White Top", "color": "White"}, {"type": "bottom", "name": "Jeans", "color": "Blue"}]
+    },
+    {
+        "id": "w_outfit_007",
+        "name": "Street Style Queen",
+        "image_url": "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=600",
+        "tags": ["Street", "Urban", "Bold"],
+        "style_category": "streetwear",
+        "gender": "female",
+        "items": [{"type": "jacket", "name": "Oversized Jacket", "color": "Black"}]
+    },
+    {
+        "id": "w_outfit_008",
+        "name": "Minimalist Elegance",
+        "image_url": "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?w=600",
+        "tags": ["Minimal", "Clean", "Elegant"],
+        "style_category": "minimalist",
+        "gender": "female",
+        "items": [{"type": "dress", "name": "Simple Dress", "color": "Beige"}]
+    },
+    {
+        "id": "w_outfit_009",
+        "name": "Party Ready",
+        "image_url": "https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=600",
+        "tags": ["Party", "Glamorous", "Night Out"],
+        "style_category": "edgy",
+        "gender": "female",
+        "items": [{"type": "dress", "name": "Cocktail Dress", "color": "Black"}]
+    },
+    {
+        "id": "w_outfit_010",
+        "name": "Summer Vibes",
+        "image_url": "https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=600",
+        "tags": ["Summer", "Light", "Fresh"],
+        "style_category": "bohemian",
+        "gender": "female",
+        "items": [{"type": "dress", "name": "Sundress", "color": "Yellow"}]
+    },
+    {
+        "id": "w_outfit_011",
+        "name": "Office Chic",
+        "image_url": "https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?w=600",
+        "tags": ["Work", "Professional", "Polished"],
+        "style_category": "classic",
+        "gender": "female",
+        "items": [{"type": "blouse", "name": "Silk Blouse", "color": "White"}, {"type": "bottom", "name": "Pencil Skirt", "color": "Black"}]
+    },
+    {
+        "id": "w_outfit_012",
+        "name": "Athleisure Queen",
+        "image_url": "https://images.unsplash.com/photo-1518459031867-a89b944bffe4?w=600",
+        "tags": ["Sporty", "Casual", "Comfortable"],
+        "style_category": "streetwear",
+        "gender": "female",
+        "items": [{"type": "set", "name": "Matching Set", "color": "Grey"}]
     }
 ]
+
+# Men's Outfits
+MEN_OUTFITS = [
+    {
+        "id": "m_outfit_001",
+        "name": "Classic Casual",
+        "image_url": "https://images.unsplash.com/photo-1617137968427-85924c800a22?w=600",
+        "tags": ["Casual", "Classic", "Relaxed"],
+        "style_category": "casual_chic",
+        "gender": "male",
+        "items": [{"type": "top", "name": "Polo Shirt", "color": "Navy"}, {"type": "bottom", "name": "Chinos", "color": "Khaki"}]
+    },
+    {
+        "id": "m_outfit_002",
+        "name": "Street Style King",
+        "image_url": "https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=600",
+        "tags": ["Street", "Urban", "Bold"],
+        "style_category": "streetwear",
+        "gender": "male",
+        "items": [{"type": "top", "name": "Graphic Tee", "color": "Black"}, {"type": "bottom", "name": "Joggers", "color": "Black"}]
+    },
+    {
+        "id": "m_outfit_003",
+        "name": "Business Professional",
+        "image_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600",
+        "tags": ["Professional", "Formal", "Sharp"],
+        "style_category": "classic",
+        "gender": "male",
+        "items": [{"type": "suit", "name": "Navy Suit", "color": "Navy"}, {"type": "shirt", "name": "White Shirt", "color": "White"}]
+    },
+    {
+        "id": "m_outfit_004",
+        "name": "Smart Casual",
+        "image_url": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=600",
+        "tags": ["Smart", "Casual", "Versatile"],
+        "style_category": "classic",
+        "gender": "male",
+        "items": [{"type": "blazer", "name": "Casual Blazer", "color": "Grey"}, {"type": "bottom", "name": "Dark Jeans", "color": "Indigo"}]
+    },
+    {
+        "id": "m_outfit_005",
+        "name": "Minimalist Modern",
+        "image_url": "https://images.unsplash.com/photo-1488161628813-04466f0bb4f5?w=600",
+        "tags": ["Minimal", "Clean", "Modern"],
+        "style_category": "minimalist",
+        "gender": "male",
+        "items": [{"type": "top", "name": "Basic Tee", "color": "White"}, {"type": "bottom", "name": "Black Jeans", "color": "Black"}]
+    },
+    {
+        "id": "m_outfit_006",
+        "name": "Weekend Vibes",
+        "image_url": "https://images.unsplash.com/photo-1516257984-b1b4d707412e?w=600",
+        "tags": ["Weekend", "Relaxed", "Comfortable"],
+        "style_category": "casual_chic",
+        "gender": "male",
+        "items": [{"type": "top", "name": "Henley Shirt", "color": "Grey"}, {"type": "bottom", "name": "Shorts", "color": "Beige"}]
+    },
+    {
+        "id": "m_outfit_007",
+        "name": "Edgy Leather",
+        "image_url": "https://images.unsplash.com/photo-1521341057461-6eb5f40b07ab?w=600",
+        "tags": ["Edgy", "Cool", "Bold"],
+        "style_category": "edgy",
+        "gender": "male",
+        "items": [{"type": "jacket", "name": "Leather Jacket", "color": "Black"}, {"type": "bottom", "name": "Slim Jeans", "color": "Black"}]
+    },
+    {
+        "id": "m_outfit_008",
+        "name": "Summer Linen",
+        "image_url": "https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=600",
+        "tags": ["Summer", "Light", "Breathable"],
+        "style_category": "bohemian",
+        "gender": "male",
+        "items": [{"type": "shirt", "name": "Linen Shirt", "color": "White"}, {"type": "bottom", "name": "Linen Pants", "color": "Beige"}]
+    },
+    {
+        "id": "m_outfit_009",
+        "name": "Sporty Athleisure",
+        "image_url": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600",
+        "tags": ["Sporty", "Active", "Modern"],
+        "style_category": "streetwear",
+        "gender": "male",
+        "items": [{"type": "hoodie", "name": "Tech Hoodie", "color": "Grey"}, {"type": "bottom", "name": "Track Pants", "color": "Black"}]
+    },
+    {
+        "id": "m_outfit_010",
+        "name": "Denim on Denim",
+        "image_url": "https://images.unsplash.com/photo-1495366691023-cc4eadcc2d7e?w=600",
+        "tags": ["Denim", "Trendy", "Bold"],
+        "style_category": "casual_chic",
+        "gender": "male",
+        "items": [{"type": "jacket", "name": "Denim Jacket", "color": "Blue"}, {"type": "bottom", "name": "Jeans", "color": "Blue"}]
+    },
+    {
+        "id": "m_outfit_011",
+        "name": "Indian Ethnic",
+        "image_url": "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600",
+        "tags": ["Ethnic", "Traditional", "Festive"],
+        "style_category": "classic",
+        "gender": "male",
+        "items": [{"type": "kurta", "name": "Designer Kurta", "color": "Cream"}]
+    },
+    {
+        "id": "m_outfit_012",
+        "name": "Date Night Ready",
+        "image_url": "https://images.unsplash.com/photo-1480429370612-2e99c9a30f53?w=600",
+        "tags": ["Date", "Stylish", "Sharp"],
+        "style_category": "classic",
+        "gender": "male",
+        "items": [{"type": "shirt", "name": "Button Down", "color": "Light Blue"}, {"type": "bottom", "name": "Chinos", "color": "Navy"}]
+    }
+]
+
+# Combined outfits - for non-binary users who see all styles
+ALL_OUTFITS = WOMEN_OUTFITS + MEN_OUTFITS
+
+# Legacy MOCK_OUTFITS for backward compatibility
+MOCK_OUTFITS = ALL_OUTFITS
 
 MOCK_PRODUCTS = [
     {"id": "prod_001", "name": "Classic White Sneakers", "brand": "Nike", "price": 4999, "image_url": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400", "category": "Shoes", "match_score": 0.94, "match_reason": "Matches 80% of your wardrobe", "shop_url": "https://nike.com"},
