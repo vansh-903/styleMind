@@ -1,6 +1,4 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface StyleDNA {
   minimalist: number;
@@ -82,68 +80,60 @@ const initialStyleDNA: StyleDNA = {
   edgy: 0,
 };
 
-export const useAppStore = create<AppState>()(
-  persist(
-    (set, get) => ({
-      userId: null,
-      userName: 'StyleMind User',
-      gender: '',
-      onboardingComplete: false,
-      swipesCount: 0,
-      styleDNA: initialStyleDNA,
-      bodyAnalysis: null,
-      wardrobeItems: [],
+export const useAppStore = create<AppState>()((set) => ({
+  userId: null,
+  userName: 'StyleMind User',
+  gender: '',
+  onboardingComplete: false,
+  swipesCount: 0,
+  styleDNA: initialStyleDNA,
+  bodyAnalysis: null,
+  wardrobeItems: [],
 
-      setUserId: (id) => set({ userId: id }),
-      setUserName: (name) => set({ userName: name }),
-      setGender: (gender) => set({ gender }),
-      setOnboardingComplete: (complete) => set({ onboardingComplete: complete }),
-      
-      incrementSwipes: () => set((state) => ({ swipesCount: state.swipesCount + 1 })),
-      
-      updateStyleDNA: (category, action) => set((state) => {
-        const newStyleDNA = { ...state.styleDNA };
-        const key = category as keyof StyleDNA;
-        if (key in newStyleDNA) {
-          if (action === 'like') {
-            newStyleDNA[key] = Math.min(1, newStyleDNA[key] + 0.05);
-          } else if (action === 'superlike') {
-            newStyleDNA[key] = Math.min(1, newStyleDNA[key] + 0.1);
-          } else if (action === 'dislike') {
-            newStyleDNA[key] = Math.max(0, newStyleDNA[key] - 0.03);
-          }
-        }
-        return { styleDNA: newStyleDNA };
-      }),
-      
-      setBodyAnalysis: (analysis) => set({ bodyAnalysis: analysis }),
-      setWardrobeItems: (items) => set({ wardrobeItems: items }),
-      addWardrobeItem: (item) => set((state) => ({ 
-        wardrobeItems: [item, ...state.wardrobeItems] 
-      })),
-      removeWardrobeItem: (id) => set((state) => ({ 
-        wardrobeItems: state.wardrobeItems.filter(item => item.id !== id) 
-      })),
-      updateWardrobeItem: (id, updates) => set((state) => ({
-        wardrobeItems: state.wardrobeItems.map(item => 
-          item.id === id ? { ...item, ...updates } : item
-        )
-      })),
-      
-      reset: () => set({
-        userId: null,
-        userName: 'StyleMind User',
-        gender: '',
-        onboardingComplete: false,
-        swipesCount: 0,
-        styleDNA: initialStyleDNA,
-        bodyAnalysis: null,
-        wardrobeItems: [],
-      }),
-    }),
-    {
-      name: 'stylemind-storage',
-      storage: createJSONStorage(() => AsyncStorage),
+  setUserId: (id) => set({ userId: id }),
+  setUserName: (name) => set({ userName: name }),
+  setGender: (gender) => set({ gender }),
+  setOnboardingComplete: (complete) => set({ onboardingComplete: complete }),
+  
+  incrementSwipes: () => set((state) => ({ swipesCount: state.swipesCount + 1 })),
+  
+  updateStyleDNA: (category, action) => set((state) => {
+    const newStyleDNA = { ...state.styleDNA };
+    const key = category as keyof StyleDNA;
+    if (key in newStyleDNA) {
+      if (action === 'like') {
+        newStyleDNA[key] = Math.min(1, newStyleDNA[key] + 0.05);
+      } else if (action === 'superlike') {
+        newStyleDNA[key] = Math.min(1, newStyleDNA[key] + 0.1);
+      } else if (action === 'dislike') {
+        newStyleDNA[key] = Math.max(0, newStyleDNA[key] - 0.03);
+      }
     }
-  )
-);
+    return { styleDNA: newStyleDNA };
+  }),
+  
+  setBodyAnalysis: (analysis) => set({ bodyAnalysis: analysis }),
+  setWardrobeItems: (items) => set({ wardrobeItems: items }),
+  addWardrobeItem: (item) => set((state) => ({ 
+    wardrobeItems: [item, ...state.wardrobeItems] 
+  })),
+  removeWardrobeItem: (id) => set((state) => ({ 
+    wardrobeItems: state.wardrobeItems.filter(item => item.id !== id) 
+  })),
+  updateWardrobeItem: (id, updates) => set((state) => ({
+    wardrobeItems: state.wardrobeItems.map(item => 
+      item.id === id ? { ...item, ...updates } : item
+    )
+  })),
+  
+  reset: () => set({
+    userId: null,
+    userName: 'StyleMind User',
+    gender: '',
+    onboardingComplete: false,
+    swipesCount: 0,
+    styleDNA: initialStyleDNA,
+    bodyAnalysis: null,
+    wardrobeItems: [],
+  }),
+}));
