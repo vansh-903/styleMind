@@ -1,13 +1,5 @@
-import Constants from 'expo-constants';
-
-const getBackendUrl = () => {
-  const url = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
-              process.env.EXPO_PUBLIC_BACKEND_URL || 
-              '';
-  return url;
-};
-
-export const API_BASE_URL = `${getBackendUrl()}/api`;
+// API configuration - use relative URLs since Kubernetes routing handles /api prefix
+export const API_BASE_URL = '/api';
 
 export const API_ENDPOINTS = {
   // Users
