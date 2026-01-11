@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -6,53 +6,646 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime
-
+import httpx
+import base64
+from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
-mongo_url = os.environ['MONGO_URL']
+mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[os.environ.get('DB_NAME', 'stylemind_db')]
 
-# Create the main app without a prefix
-app = FastAPI()
+# LLM API Key
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
+
+# Create the main app
+app = FastAPI(title="StyleMind API")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-# Define Models
-class StatusCheck(BaseModel):
+# ==================== MODELS ====================
+
+class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    email: Optional[str] = None
+    name: str = "StyleMind User"
+    username: str = ""
+    gender: str = ""  # male, female, non-binary
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    profile_complete: bool = False
+    onboarding_complete: bool = False
+    swipes_count: int = 0
+    body_analysis: Optional[Dict[str, Any]] = None
+    style_dna: Dict[str, float] = Field(default_factory=lambda: {
+        "minimalist": 0.0,
+        "casual_chic": 0.0,
+        "streetwear": 0.0,
+        "bohemian": 0.0,
+        "classic": 0.0,
+        "edgy": 0.0
+    })
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+class UserCreate(BaseModel):
+    name: Optional[str] = "StyleMind User"
+    email: Optional[str] = None
+    gender: Optional[str] = None
 
-# Add your routes to the router instead of directly to app
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    gender: Optional[str] = None
+    onboarding_complete: Optional[bool] = None
+    profile_complete: Optional[bool] = None
+    body_analysis: Optional[Dict[str, Any]] = None
+    style_dna: Optional[Dict[str, float]] = None
+
+class WardrobeItem(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    image_base64: str
+    category: str  # Tops, Bottoms, Dresses, Outerwear, Shoes, Accessories
+    subcategory: str  # T-Shirt, Jeans, Sneakers, etc.
+    colors: List[str] = []
+    pattern: str = "Solid"  # Solid, Striped, Floral, etc.
+    occasions: List[str] = []  # Casual, Work, Party, Date, Formal
+    brand: Optional[str] = None
+    times_worn: int = 0
+    last_worn: Optional[datetime] = None
+    favorite: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class WardrobeItemCreate(BaseModel):
+    user_id: str
+    image_base64: str
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    colors: Optional[List[str]] = None
+    pattern: Optional[str] = None
+    occasions: Optional[List[str]] = None
+    brand: Optional[str] = None
+
+class WardrobeItemUpdate(BaseModel):
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    colors: Optional[List[str]] = None
+    pattern: Optional[str] = None
+    occasions: Optional[List[str]] = None
+    brand: Optional[str] = None
+    times_worn: Optional[int] = None
+    last_worn: Optional[datetime] = None
+    favorite: Optional[bool] = None
+
+class SwipeRecord(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    outfit_id: str
+    action: str  # like, dislike, superlike
+    style_category: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class SwipeCreate(BaseModel):
+    user_id: str
+    outfit_id: str
+    action: str
+    style_category: str
+
+class Outfit(BaseModel):
+    id: str
+    name: str
+    image_url: str
+    tags: List[str]
+    style_category: str
+    items: List[Dict[str, str]]
+
+class AnalyzeClothingRequest(BaseModel):
+    image_base64: str
+
+class AnalyzeBodyRequest(BaseModel):
+    image_base64: str
+
+class OutfitSuggestionRequest(BaseModel):
+    user_id: str
+    occasion: str  # work, casual, date, party
+    weather: Optional[Dict[str, Any]] = None
+
+# ==================== MOCK DATA ====================
+
+MOCK_OUTFITS = [
+    {
+        "id": "outfit_001",
+        "name": "Casual Summer Vibes",
+        "image_url": "https://images.unsplash.com/photo-1523398002811-999ca8dec234?w=600",
+        "tags": ["Casual", "Summer", "Relaxed"],
+        "style_category": "casual_chic",
+        "items": [{"type": "top", "name": "Linen Shirt", "color": "White"}, {"type": "bottom", "name": "Chino Shorts", "color": "Beige"}]
+    },
+    {
+        "id": "outfit_002",
+        "name": "Street Style Urban",
+        "image_url": "https://images.unsplash.com/photo-1590330297626-d7aff25a0431?w=600",
+        "tags": ["Street", "Urban", "Bold"],
+        "style_category": "streetwear",
+        "items": [{"type": "top", "name": "Graphic Tee", "color": "Black"}, {"type": "bottom", "name": "Cargo Pants", "color": "Olive"}]
+    },
+    {
+        "id": "outfit_003",
+        "name": "Elegant Evening",
+        "image_url": "https://images.unsplash.com/photo-1624911104820-5316c700b907?w=600",
+        "tags": ["Elegant", "Evening", "Sophisticated"],
+        "style_category": "classic",
+        "items": [{"type": "dress", "name": "White Dress", "color": "White"}]
+    },
+    {
+        "id": "outfit_004",
+        "name": "Boho Chic",
+        "image_url": "https://images.unsplash.com/photo-1622122201640-3b34a4a49444?w=600",
+        "tags": ["Boho", "Floral", "Free-spirited"],
+        "style_category": "bohemian",
+        "items": [{"type": "dress", "name": "Floral Maxi", "color": "Multi"}]
+    },
+    {
+        "id": "outfit_005",
+        "name": "Minimalist Modern",
+        "image_url": "https://images.unsplash.com/photo-1624223237138-21a37e61dec0?w=600",
+        "tags": ["Minimal", "Clean", "Modern"],
+        "style_category": "minimalist",
+        "items": [{"type": "top", "name": "Basic Tee", "color": "Grey"}, {"type": "bottom", "name": "Slim Jeans", "color": "Blue"}]
+    },
+    {
+        "id": "outfit_006",
+        "name": "Edgy Rocker",
+        "image_url": "https://images.pexels.com/photos/1895943/pexels-photo-1895943.jpeg?w=600",
+        "tags": ["Edgy", "Rock", "Bold"],
+        "style_category": "edgy",
+        "items": [{"type": "jacket", "name": "Leather Jacket", "color": "Black"}, {"type": "bottom", "name": "Ripped Jeans", "color": "Black"}]
+    },
+    {
+        "id": "outfit_007",
+        "name": "Traditional Ethnic",
+        "image_url": "https://images.unsplash.com/photo-1739773375441-e8ded0ce3605?w=600",
+        "tags": ["Ethnic", "Traditional", "Festive"],
+        "style_category": "classic",
+        "items": [{"type": "kurta", "name": "Yellow Kurta", "color": "Yellow"}]
+    },
+    {
+        "id": "outfit_008",
+        "name": "Trendy Stripes",
+        "image_url": "https://images.unsplash.com/photo-1739773375456-79be292cedb1?w=600",
+        "tags": ["Trendy", "Stripes", "Fun"],
+        "style_category": "casual_chic",
+        "items": [{"type": "dress", "name": "Striped Dress", "color": "Yellow/Pink"}]
+    },
+    {
+        "id": "outfit_009",
+        "name": "Chic Pink",
+        "image_url": "https://images.unsplash.com/photo-1739773375403-36a4ba177f73?w=600",
+        "tags": ["Chic", "Pink", "Feminine"],
+        "style_category": "casual_chic",
+        "items": [{"type": "dress", "name": "Pink Dress", "color": "Pink"}]
+    },
+    {
+        "id": "outfit_010",
+        "name": "Stylish Duo",
+        "image_url": "https://images.unsplash.com/photo-1762343292182-b0cb71a19111?w=600",
+        "tags": ["Stylish", "Trendy", "Bold"],
+        "style_category": "streetwear",
+        "items": [{"type": "outfit", "name": "Trendy Ensemble", "color": "Mixed"}]
+    },
+    {
+        "id": "outfit_011",
+        "name": "Modern Minimalist",
+        "image_url": "https://images.unsplash.com/photo-1763750781876-d99c552c891c?w=600",
+        "tags": ["Modern", "Minimal", "Sleek"],
+        "style_category": "minimalist",
+        "items": [{"type": "top", "name": "Clean Cut Top", "color": "Black/White"}]
+    },
+    {
+        "id": "outfit_012",
+        "name": "Professional Casual",
+        "image_url": "https://images.pexels.com/photos/923229/pexels-photo-923229.jpeg?w=600",
+        "tags": ["Professional", "Smart", "Casual"],
+        "style_category": "classic",
+        "items": [{"type": "top", "name": "Blazer", "color": "Navy"}, {"type": "bottom", "name": "Chinos", "color": "Tan"}]
+    }
+]
+
+MOCK_PRODUCTS = [
+    {"id": "prod_001", "name": "Classic White Sneakers", "brand": "Nike", "price": 4999, "image_url": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400", "category": "Shoes", "match_score": 0.94, "match_reason": "Matches 80% of your wardrobe", "shop_url": "https://nike.com"},
+    {"id": "prod_002", "name": "Denim Jacket", "brand": "Levi's", "price": 3499, "image_url": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=400", "category": "Outerwear", "match_score": 0.89, "match_reason": "Great for layering", "shop_url": "https://levis.com"},
+    {"id": "prod_003", "name": "Crossbody Bag", "brand": "Coach", "price": 8999, "image_url": "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400", "category": "Accessories", "match_score": 0.85, "match_reason": "Completes your evening looks", "shop_url": "https://coach.com"},
+    {"id": "prod_004", "name": "Slim Fit Chinos", "brand": "H&M", "price": 1999, "image_url": "https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=400", "category": "Bottoms", "match_score": 0.92, "match_reason": "Versatile for work and casual", "shop_url": "https://hm.com"},
+]
+
+# ==================== ROUTES ====================
+
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "StyleMind API", "version": "1.0.0"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.dict()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.dict())
-    return status_obj
+# User Routes
+@api_router.post("/users", response_model=User)
+async def create_user(user_data: UserCreate):
+    user = User(**user_data.dict())
+    await db.users.insert_one(user.dict())
+    return user
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find().to_list(1000)
-    return [StatusCheck(**status_check) for status_check in status_checks]
+@api_router.get("/users/{user_id}", response_model=User)
+async def get_user(user_id: str):
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return User(**user)
 
-# Include the router in the main app
+@api_router.put("/users/{user_id}", response_model=User)
+async def update_user(user_id: str, user_update: UserUpdate):
+    update_data = {k: v for k, v in user_update.dict().items() if v is not None}
+    if update_data:
+        await db.users.update_one({"id": user_id}, {"$set": update_data})
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return User(**user)
+
+# Wardrobe Routes
+@api_router.post("/wardrobe", response_model=WardrobeItem)
+async def create_wardrobe_item(item_data: WardrobeItemCreate):
+    item = WardrobeItem(
+        user_id=item_data.user_id,
+        image_base64=item_data.image_base64,
+        category=item_data.category or "Unknown",
+        subcategory=item_data.subcategory or "Unknown",
+        colors=item_data.colors or [],
+        pattern=item_data.pattern or "Solid",
+        occasions=item_data.occasions or [],
+        brand=item_data.brand
+    )
+    await db.wardrobe.insert_one(item.dict())
+    return item
+
+@api_router.get("/wardrobe/{user_id}", response_model=List[WardrobeItem])
+async def get_wardrobe(user_id: str, category: Optional[str] = None):
+    query = {"user_id": user_id}
+    if category and category != "All":
+        query["category"] = category
+    items = await db.wardrobe.find(query).to_list(1000)
+    return [WardrobeItem(**item) for item in items]
+
+@api_router.get("/wardrobe/item/{item_id}", response_model=WardrobeItem)
+async def get_wardrobe_item(item_id: str):
+    item = await db.wardrobe.find_one({"id": item_id})
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return WardrobeItem(**item)
+
+@api_router.put("/wardrobe/{item_id}", response_model=WardrobeItem)
+async def update_wardrobe_item(item_id: str, item_update: WardrobeItemUpdate):
+    update_data = {k: v for k, v in item_update.dict().items() if v is not None}
+    if update_data:
+        await db.wardrobe.update_one({"id": item_id}, {"$set": update_data})
+    item = await db.wardrobe.find_one({"id": item_id})
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return WardrobeItem(**item)
+
+@api_router.delete("/wardrobe/{item_id}")
+async def delete_wardrobe_item(item_id: str):
+    result = await db.wardrobe.delete_one({"id": item_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return {"message": "Item deleted successfully"}
+
+# Swipe Routes
+@api_router.post("/swipes", response_model=SwipeRecord)
+async def create_swipe(swipe_data: SwipeCreate):
+    swipe = SwipeRecord(**swipe_data.dict())
+    await db.swipes.insert_one(swipe.dict())
+    
+    # Update user's style DNA based on swipe
+    user = await db.users.find_one({"id": swipe_data.user_id})
+    if user:
+        style_dna = user.get("style_dna", {})
+        category = swipe_data.style_category
+        if category in style_dna:
+            if swipe_data.action == "like":
+                style_dna[category] = min(1.0, style_dna[category] + 0.05)
+            elif swipe_data.action == "superlike":
+                style_dna[category] = min(1.0, style_dna[category] + 0.1)
+            elif swipe_data.action == "dislike":
+                style_dna[category] = max(0.0, style_dna[category] - 0.03)
+        
+        swipes_count = user.get("swipes_count", 0) + 1
+        await db.users.update_one(
+            {"id": swipe_data.user_id},
+            {"$set": {"style_dna": style_dna, "swipes_count": swipes_count}}
+        )
+    
+    return swipe
+
+@api_router.get("/swipes/{user_id}", response_model=List[SwipeRecord])
+async def get_swipes(user_id: str):
+    swipes = await db.swipes.find({"user_id": user_id}).to_list(1000)
+    return [SwipeRecord(**swipe) for swipe in swipes]
+
+# Outfits Routes
+@api_router.get("/outfits", response_model=List[Outfit])
+async def get_outfits(skip: int = 0, limit: int = 20):
+    return MOCK_OUTFITS[skip:skip+limit]
+
+@api_router.get("/outfits/{outfit_id}", response_model=Outfit)
+async def get_outfit(outfit_id: str):
+    for outfit in MOCK_OUTFITS:
+        if outfit["id"] == outfit_id:
+            return Outfit(**outfit)
+    raise HTTPException(status_code=404, detail="Outfit not found")
+
+# AI Analysis Routes
+@api_router.post("/analyze-clothing")
+async def analyze_clothing(request: AnalyzeClothingRequest):
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"clothing_analysis_{uuid.uuid4()}",
+            system_message="""You are a fashion AI expert. Analyze clothing items from images and provide structured data.
+Respond ONLY with valid JSON in this exact format:
+{
+  "category": "Tops|Bottoms|Dresses|Outerwear|Shoes|Accessories",
+  "subcategory": "specific type like T-Shirt, Jeans, Sneakers, etc.",
+  "colors": ["primary color", "secondary color if any"],
+  "pattern": "Solid|Striped|Floral|Plaid|Abstract|Printed",
+  "occasions": ["Casual", "Work", "Party", "Date", "Formal", "Sport"],
+  "confidence": 0.95
+}"""
+        ).with_model("openai", "gpt-4o")
+        
+        image_content = ImageContent(image_base64=request.image_base64)
+        user_message = UserMessage(
+            text="Analyze this clothing item and provide the category, subcategory, colors, pattern, and suitable occasions.",
+            image_contents=[image_content]
+        )
+        
+        response = await chat.send_message(user_message)
+        
+        # Parse the JSON response
+        import json
+        # Clean the response - remove markdown code blocks if present
+        clean_response = response.strip()
+        if clean_response.startswith("```json"):
+            clean_response = clean_response[7:]
+        if clean_response.startswith("```"):
+            clean_response = clean_response[3:]
+        if clean_response.endswith("```"):
+            clean_response = clean_response[:-3]
+        
+        analysis = json.loads(clean_response.strip())
+        return analysis
+        
+    except Exception as e:
+        logger.error(f"Error analyzing clothing: {str(e)}")
+        # Return default analysis if AI fails
+        return {
+            "category": "Tops",
+            "subcategory": "T-Shirt",
+            "colors": ["Unknown"],
+            "pattern": "Solid",
+            "occasions": ["Casual"],
+            "confidence": 0.5,
+            "error": str(e)
+        }
+
+@api_router.post("/analyze-body")
+async def analyze_body(request: AnalyzeBodyRequest):
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"body_analysis_{uuid.uuid4()}",
+            system_message="""You are a fashion styling expert. Analyze body type and skin tone from selfie images to provide personalized fashion recommendations.
+Respond ONLY with valid JSON in this exact format:
+{
+  "body_type": {
+    "type": "Rectangle|Hourglass|Pear|Apple|Inverted Triangle",
+    "description": "Brief description of the body type",
+    "recommendations": ["style tip 1", "style tip 2", "style tip 3"]
+  },
+  "skin_tone": {
+    "type": "Fair|Light|Medium|Tan|Deep",
+    "undertone": "warm|cool|neutral",
+    "best_colors": ["color1", "color2", "color3", "color4"],
+    "avoid_colors": ["color1", "color2"]
+  },
+  "face_shape": {
+    "type": "Oval|Round|Square|Heart|Oblong",
+    "description": "Brief styling note"
+  }
+}"""
+        ).with_model("openai", "gpt-4o")
+        
+        image_content = ImageContent(image_base64=request.image_base64)
+        user_message = UserMessage(
+            text="Analyze this person's body type, skin tone with undertone, and face shape. Provide fashion recommendations.",
+            image_contents=[image_content]
+        )
+        
+        response = await chat.send_message(user_message)
+        
+        import json
+        clean_response = response.strip()
+        if clean_response.startswith("```json"):
+            clean_response = clean_response[7:]
+        if clean_response.startswith("```"):
+            clean_response = clean_response[3:]
+        if clean_response.endswith("```"):
+            clean_response = clean_response[:-3]
+        
+        analysis = json.loads(clean_response.strip())
+        return analysis
+        
+    except Exception as e:
+        logger.error(f"Error analyzing body: {str(e)}")
+        return {
+            "body_type": {
+                "type": "Rectangle",
+                "description": "Balanced proportions",
+                "recommendations": ["Belted dresses", "Peplum tops", "High-waisted bottoms"]
+            },
+            "skin_tone": {
+                "type": "Medium",
+                "undertone": "warm",
+                "best_colors": ["Coral", "Gold", "Olive", "Terracotta"],
+                "avoid_colors": ["Neon", "Pastel Pink"]
+            },
+            "face_shape": {
+                "type": "Oval",
+                "description": "Versatile - most styles work well"
+            },
+            "error": str(e)
+        }
+
+# Weather Route (using Open-Meteo - free, no API key needed)
+@api_router.get("/weather")
+async def get_weather(lat: float = 19.0760, lon: float = 72.8777):  # Default: Mumbai
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"https://api.open-meteo.com/v1/forecast",
+                params={
+                    "latitude": lat,
+                    "longitude": lon,
+                    "current": "temperature_2m,relative_humidity_2m,weather_code",
+                    "timezone": "auto"
+                }
+            )
+            data = response.json()
+            
+            # Weather code to condition mapping
+            weather_codes = {
+                0: "Clear", 1: "Mainly Clear", 2: "Partly Cloudy", 3: "Overcast",
+                45: "Foggy", 48: "Foggy", 51: "Light Drizzle", 53: "Drizzle",
+                55: "Heavy Drizzle", 61: "Light Rain", 63: "Rain", 65: "Heavy Rain",
+                71: "Light Snow", 73: "Snow", 75: "Heavy Snow", 80: "Light Showers",
+                81: "Showers", 82: "Heavy Showers", 95: "Thunderstorm"
+            }
+            
+            current = data.get("current", {})
+            weather_code = current.get("weather_code", 0)
+            
+            return {
+                "temperature": round(current.get("temperature_2m", 25)),
+                "humidity": current.get("relative_humidity_2m", 50),
+                "condition": weather_codes.get(weather_code, "Unknown"),
+                "location": "Your Location",
+                "icon": "partly-cloudy" if weather_code < 50 else "rainy" if weather_code < 80 else "stormy"
+            }
+    except Exception as e:
+        logger.error(f"Weather API error: {str(e)}")
+        return {
+            "temperature": 28,
+            "humidity": 65,
+            "condition": "Partly Cloudy",
+            "location": "Mumbai",
+            "icon": "partly-cloudy"
+        }
+
+# Outfit Suggestion Route
+@api_router.post("/outfit-suggestion")
+async def get_outfit_suggestion(request: OutfitSuggestionRequest):
+    try:
+        # Get user's wardrobe
+        wardrobe_items = await db.wardrobe.find({"user_id": request.user_id}).to_list(100)
+        
+        if not wardrobe_items:
+            return {
+                "success": False,
+                "message": "Add items to your wardrobe to get outfit suggestions",
+                "outfit": None
+            }
+        
+        # Filter by occasion
+        occasion_map = {
+            "work": ["Work", "Formal"],
+            "casual": ["Casual"],
+            "date": ["Date", "Party"],
+            "party": ["Party", "Date"]
+        }
+        
+        target_occasions = occasion_map.get(request.occasion, ["Casual"])
+        
+        # Simple outfit selection logic
+        tops = [item for item in wardrobe_items if item.get("category") in ["Tops", "Dresses"]]
+        bottoms = [item for item in wardrobe_items if item.get("category") == "Bottoms"]
+        shoes = [item for item in wardrobe_items if item.get("category") == "Shoes"]
+        
+        outfit_items = []
+        
+        if tops:
+            # Prefer items that match the occasion
+            matching_tops = [t for t in tops if any(occ in t.get("occasions", []) for occ in target_occasions)]
+            selected_top = matching_tops[0] if matching_tops else tops[0]
+            outfit_items.append({
+                "id": selected_top["id"],
+                "type": selected_top["category"],
+                "name": selected_top["subcategory"],
+                "color": selected_top["colors"][0] if selected_top.get("colors") else "Unknown",
+                "image_base64": selected_top["image_base64"]
+            })
+        
+        if bottoms and tops and tops[0].get("category") != "Dresses":
+            matching_bottoms = [b for b in bottoms if any(occ in b.get("occasions", []) for occ in target_occasions)]
+            selected_bottom = matching_bottoms[0] if matching_bottoms else bottoms[0]
+            outfit_items.append({
+                "id": selected_bottom["id"],
+                "type": "Bottoms",
+                "name": selected_bottom["subcategory"],
+                "color": selected_bottom["colors"][0] if selected_bottom.get("colors") else "Unknown",
+                "image_base64": selected_bottom["image_base64"]
+            })
+        
+        if shoes:
+            selected_shoes = shoes[0]
+            outfit_items.append({
+                "id": selected_shoes["id"],
+                "type": "Shoes",
+                "name": selected_shoes["subcategory"],
+                "color": selected_shoes["colors"][0] if selected_shoes.get("colors") else "Unknown",
+                "image_base64": selected_shoes["image_base64"]
+            })
+        
+        return {
+            "success": True,
+            "occasion": request.occasion,
+            "outfit": outfit_items,
+            "weather_note": f"Perfect for {request.weather.get('condition', 'today')}" if request.weather else None
+        }
+        
+    except Exception as e:
+        logger.error(f"Outfit suggestion error: {str(e)}")
+        return {
+            "success": False,
+            "message": str(e),
+            "outfit": None
+        }
+
+# Products Route
+@api_router.get("/products")
+async def get_products(min_price: int = 0, max_price: int = 100000):
+    filtered = [p for p in MOCK_PRODUCTS if min_price <= p["price"] <= max_price]
+    return filtered
+
+@api_router.get("/wardrobe-gaps/{user_id}")
+async def get_wardrobe_gaps(user_id: str):
+    wardrobe_items = await db.wardrobe.find({"user_id": user_id}).to_list(100)
+    
+    categories = {"Tops": 0, "Bottoms": 0, "Dresses": 0, "Outerwear": 0, "Shoes": 0, "Accessories": 0}
+    for item in wardrobe_items:
+        cat = item.get("category", "Unknown")
+        if cat in categories:
+            categories[cat] += 1
+    
+    gaps = []
+    if categories["Shoes"] < 2:
+        gaps.append({"item": "White Sneakers", "reason": "Versatile, matches most outfits", "priority": "high"})
+    if categories["Outerwear"] < 1:
+        gaps.append({"item": "Light Jacket", "reason": "Great for layering", "priority": "medium"})
+    if categories["Accessories"] < 2:
+        gaps.append({"item": "Statement Bag", "reason": "Elevates any outfit", "priority": "low"})
+    if categories["Bottoms"] < 3:
+        gaps.append({"item": "Versatile Chinos", "reason": "Works for work and casual", "priority": "medium"})
+    
+    return {"gaps": gaps, "category_counts": categories}
+
+# Include the router
 app.include_router(api_router)
 
 app.add_middleware(
@@ -62,13 +655,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
