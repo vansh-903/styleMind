@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Image,
   Animated,
   PanResponder,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,23 +22,36 @@ import { API_ENDPOINTS } from '../src/constants/api';
 const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 100;
 
-const OUTFITS = [
-  { id: '1', name: 'Casual Summer Vibes', image: 'https://images.unsplash.com/photo-1523398002811-999ca8dec234?w=600', tags: ['Casual', 'Summer'], style: 'casual_chic' },
-  { id: '2', name: 'Street Style Urban', image: 'https://images.unsplash.com/photo-1590330297626-d7aff25a0431?w=600', tags: ['Street', 'Urban'], style: 'streetwear' },
-  { id: '3', name: 'Elegant Evening', image: 'https://images.unsplash.com/photo-1624911104820-5316c700b907?w=600', tags: ['Elegant', 'Evening'], style: 'classic' },
-  { id: '4', name: 'Boho Chic', image: 'https://images.unsplash.com/photo-1622122201640-3b34a4a49444?w=600', tags: ['Boho', 'Floral'], style: 'bohemian' },
-  { id: '5', name: 'Minimalist Modern', image: 'https://images.unsplash.com/photo-1624223237138-21a37e61dec0?w=600', tags: ['Minimal', 'Clean'], style: 'minimalist' },
-  { id: '6', name: 'Edgy Rocker', image: 'https://images.pexels.com/photos/1895943/pexels-photo-1895943.jpeg?w=600', tags: ['Edgy', 'Bold'], style: 'edgy' },
-  { id: '7', name: 'Traditional Ethnic', image: 'https://images.unsplash.com/photo-1739773375441-e8ded0ce3605?w=600', tags: ['Ethnic', 'Traditional'], style: 'classic' },
-  { id: '8', name: 'Trendy Stripes', image: 'https://images.unsplash.com/photo-1739773375456-79be292cedb1?w=600', tags: ['Trendy', 'Fun'], style: 'casual_chic' },
-  { id: '9', name: 'Chic Pink', image: 'https://images.unsplash.com/photo-1739773375403-36a4ba177f73?w=600', tags: ['Chic', 'Pink'], style: 'casual_chic' },
-  { id: '10', name: 'Professional Smart', image: 'https://images.pexels.com/photos/923229/pexels-photo-923229.jpeg?w=600', tags: ['Professional', 'Smart'], style: 'classic' },
-];
-
 export default function SwipeLearningScreen() {
+  const [outfits, setOutfits] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [swipeDirection, setSwipeDirection] = useState<string | null>(null);
   const position = useRef(new Animated.ValueXY()).current;
+  const { userId, gender, incrementSwipes, updateStyleDNA } = useAppStore();
+
+  useEffect(() => {
+    fetchOutfits();
+  }, [gender]);
+
+  const fetchOutfits = async () => {
+    try {
+      // Fetch gender-specific outfits and limit to 10 for onboarding
+      const response = await axios.get(API_ENDPOINTS.getOutfits, {
+        params: { gender: gender || undefined, limit: 10 }
+      });
+      setOutfits(response.data.slice(0, 10));
+    } catch (error) {
+      console.error('Error fetching outfits:', error);
+      // Fallback to empty array if API fails
+      setOutfits([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const currentOutfit = outfits[currentIndex];
+  const nextOutfit = outfits[currentIndex + 1];
   const { userId, incrementSwipes, updateStyleDNA } = useAppStore();
 
   const currentOutfit = OUTFITS[currentIndex];
