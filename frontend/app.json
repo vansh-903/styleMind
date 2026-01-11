@@ -20,8 +20,11 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
+    },
+    "extra": {
+      "EXPO_PUBLIC_BACKEND_URL": "https://12c1137d-72d6-48f7-bb48-4dc26a13c704.preview.emergentagent.com"
     },
     "plugins": [
       "expo-router",
