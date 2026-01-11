@@ -26,15 +26,18 @@ export default function DiscoverScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const position = useRef(new Animated.ValueXY()).current;
-  const { userId, swipesCount, incrementSwipes, updateStyleDNA } = useAppStore();
+  const { userId, gender, swipesCount, incrementSwipes, updateStyleDNA } = useAppStore();
 
   useEffect(() => {
     fetchOutfits();
-  }, []);
+  }, [gender]);
 
   const fetchOutfits = async () => {
     try {
-      const response = await axios.get(API_ENDPOINTS.getOutfits);
+      // Pass gender to get gender-appropriate outfits
+      const response = await axios.get(API_ENDPOINTS.getOutfits, {
+        params: { gender: gender || undefined }
+      });
       setOutfits(response.data);
     } catch (error) {
       console.error('Error fetching outfits:', error);
