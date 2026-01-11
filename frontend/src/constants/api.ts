@@ -1,6 +1,13 @@
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+import Constants from 'expo-constants';
 
-export const API_BASE_URL = `${BACKEND_URL}/api`;
+const getBackendUrl = () => {
+  const url = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
+              process.env.EXPO_PUBLIC_BACKEND_URL || 
+              '';
+  return url;
+};
+
+export const API_BASE_URL = `${getBackendUrl()}/api`;
 
 export const API_ENDPOINTS = {
   // Users
