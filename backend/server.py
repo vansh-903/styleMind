@@ -565,6 +565,9 @@ async def analyze_clothing(request: AnalyzeClothingRequest):
 @api_router.post("/analyze-body")
 async def analyze_body(request: AnalyzeBodyRequest):
     """Analyze body type, skin tone using Gemini AI."""
+    logger.info(f"Body analysis request received, image size: {len(request.image_base64)} chars")
+    logger.info(f"GEMINI_API_KEY configured: {bool(GEMINI_API_KEY)}, first 10 chars: {GEMINI_API_KEY[:10] if GEMINI_API_KEY else 'NONE'}...")
+
     if not GEMINI_API_KEY:
         logger.warning("Gemini API key not configured, returning mock data")
         return {
@@ -593,11 +596,14 @@ async def analyze_body(request: AnalyzeBodyRequest):
         }
 
     try:
+        logger.info("Creating Gemini service...")
         gemini = get_gemini_service(GEMINI_API_KEY)
+        logger.info("Calling Gemini analyze_body...")
         result = await gemini.analyze_body(request.image_base64)
+        logger.info(f"Gemini returned: body_type={result.get('body_type', {}).get('type')}, confidence={result.get('confidence')}")
         return result
     except Exception as e:
-        logger.error(f"Error analyzing body: {str(e)}")
+        logger.error(f"Error analyzing body: {str(e)}", exc_info=True)
         return {
             "body_type": {
                 "type": "Rectangle",

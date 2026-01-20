@@ -48,15 +48,17 @@ class OutfitSuggestion(BaseModel):
 class GeminiService:
     """
     AI service using Google Gemini for fashion analysis.
+    Uses the new google.genai SDK.
     """
 
     def __init__(self, api_key: str):
         """Initialize with Gemini API key."""
         self.client = genai.Client(api_key=api_key)
-        self.model = "gemini-2.0-flash"  # Fast and capable for vision
+        self.model_name = "gemini-2.0-flash"
+        logger.info(f"GeminiService initialized with model: {self.model_name}")
 
     def _prepare_image(self, image_base64: str) -> types.Part:
-        """Convert base64 image to Gemini Part."""
+        """Convert base64 image to Gemini Part format."""
         # Handle data URI format
         if image_base64.startswith("data:"):
             header, base64_data = image_base64.split(",", 1)
@@ -114,21 +116,34 @@ Respond with ONLY valid JSON:
 IMPORTANT: Recognize Indian garments accurately - kurta, kurti, saree, lehenga, salwar kameez, churidar, dupatta, sherwani, juttis, kolhapuris, mojaris."""
 
         try:
+            logger.info("Calling Gemini for clothing analysis...")
             response = self.client.models.generate_content(
-                model=self.model,
+                model=self.model_name,
                 contents=[image_part, prompt],
                 config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
                     temperature=0.2,
                 )
             )
 
-            result = json.loads(response.text)
-            logger.info(f"Clothing analysis: {result.get('category')}/{result.get('subcategory')}")
+            # Extract text and parse JSON
+            response_text = response.text.strip()
+            logger.info(f"Gemini response (first 100 chars): {response_text[:100]}...")
+
+            # Remove markdown code blocks if present
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+            response_text = response_text.strip()
+
+            result = json.loads(response_text)
+            logger.info(f"Clothing analysis successful: {result.get('category')}/{result.get('subcategory')}")
             return result
 
         except Exception as e:
-            logger.error(f"Clothing analysis failed: {e}")
+            logger.error(f"Clothing analysis failed: {e}", exc_info=True)
             return {
                 "category": "Tops",
                 "subcategory": "Unknown",
@@ -205,21 +220,34 @@ Be specific with colors (e.g., "Emerald Green" not just "Green", "Coral" not jus
 Consider Indian fashion context - include recommendations for ethnic wear when relevant."""
 
         try:
+            logger.info("Calling Gemini for body analysis...")
             response = self.client.models.generate_content(
-                model=self.model,
+                model=self.model_name,
                 contents=[image_part, prompt],
                 config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
                     temperature=0.3,
                 )
             )
 
-            result = json.loads(response.text)
-            logger.info(f"Body analysis: {result.get('body_type', {}).get('type')}")
+            # Extract text and parse JSON
+            response_text = response.text.strip()
+            logger.info(f"Gemini raw response (first 200 chars): {response_text[:200]}...")
+
+            # Remove markdown code blocks if present
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+            response_text = response_text.strip()
+
+            result = json.loads(response_text)
+            logger.info(f"Body analysis successful: body_type={result.get('body_type', {}).get('type')}, skin_tone={result.get('skin_tone', {}).get('type')}")
             return result
 
         except Exception as e:
-            logger.error(f"Body analysis failed: {e}")
+            logger.error(f"Body analysis failed: {e}", exc_info=True)
             return {
                 "body_type": {
                     "type": "Rectangle",
@@ -307,22 +335,32 @@ Respond with ONLY valid JSON:
 IMPORTANT: Only use item IDs that exist in the wardrobe. Create a cohesive, color-coordinated outfit."""
 
         try:
+            logger.info("Calling Gemini for outfit suggestion...")
             response = self.client.models.generate_content(
-                model=self.model,
+                model=self.model_name,
                 contents=[prompt],
                 config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
                     temperature=0.5,
                 )
             )
 
-            result = json.loads(response.text)
+            # Extract text and parse JSON
+            response_text = response.text.strip()
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+            response_text = response_text.strip()
+
+            result = json.loads(response_text)
             result["success"] = True
             logger.info(f"Outfit suggestion generated: {result.get('outfit_name')}")
             return result
 
         except Exception as e:
-            logger.error(f"Outfit suggestion failed: {e}")
+            logger.error(f"Outfit suggestion failed: {e}", exc_info=True)
             return {
                 "success": False,
                 "message": f"Failed to generate outfit: {str(e)}",
@@ -377,21 +415,31 @@ Respond with ONLY valid JSON:
 Focus on versatile pieces that create the most new outfit combinations."""
 
         try:
+            logger.info("Calling Gemini for shopping recommendations...")
             response = self.client.models.generate_content(
-                model=self.model,
+                model=self.model_name,
                 contents=[prompt],
                 config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
                     temperature=0.4,
                 )
             )
 
-            result = json.loads(response.text)
+            # Extract text and parse JSON
+            response_text = response.text.strip()
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+            response_text = response_text.strip()
+
+            result = json.loads(response_text)
             logger.info(f"Shopping recommendations: {len(result.get('gaps', []))} gaps identified")
             return result
 
         except Exception as e:
-            logger.error(f"Shopping recommendations failed: {e}")
+            logger.error(f"Shopping recommendations failed: {e}", exc_info=True)
             return {
                 "gaps": [],
                 "wardrobe_summary": "Unable to analyze",
