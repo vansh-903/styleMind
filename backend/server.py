@@ -1,7 +1,6 @@
 from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
@@ -19,10 +18,11 @@ from chat_service import get_chat_service, ChatService
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ.get('DB_NAME', 'stylemind_db')]
+# In-memory storage for prototype (no MongoDB needed)
+# This simplifies deployment - data resets on restart
+users_db: Dict[str, Dict] = {}
+wardrobe_db: Dict[str, List[Dict]] = {}
+swipes_db: Dict[str, List[Dict]] = {}
 
 # Gemini API Key
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', os.environ.get('GOOGLE_AI_API_KEY', ''))
@@ -404,25 +404,23 @@ async def root():
 @api_router.post("/users", response_model=User)
 async def create_user(user_data: UserCreate):
     user = User(**user_data.dict())
-    await db.users.insert_one(user.dict())
+    users_db[user.id] = user.dict()
     return user
 
 @api_router.get("/users/{user_id}", response_model=User)
 async def get_user(user_id: str):
-    user = await db.users.find_one({"id": user_id})
+    user = users_db.get(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return User(**user)
 
 @api_router.put("/users/{user_id}", response_model=User)
 async def update_user(user_id: str, user_update: UserUpdate):
-    update_data = {k: v for k, v in user_update.dict().items() if v is not None}
-    if update_data:
-        await db.users.update_one({"id": user_id}, {"$set": update_data})
-    user = await db.users.find_one({"id": user_id})
-    if not user:
+    if user_id not in users_db:
         raise HTTPException(status_code=404, detail="User not found")
-    return User(**user)
+    update_data = {k: v for k, v in user_update.dict().items() if v is not None}
+    users_db[user_id].update(update_data)
+    return User(**users_db[user_id])
 
 # Wardrobe Routes
 @api_router.post("/wardrobe", response_model=WardrobeItem)
@@ -437,49 +435,55 @@ async def create_wardrobe_item(item_data: WardrobeItemCreate):
         occasions=item_data.occasions or [],
         brand=item_data.brand
     )
-    await db.wardrobe.insert_one(item.dict())
+    if item_data.user_id not in wardrobe_db:
+        wardrobe_db[item_data.user_id] = []
+    wardrobe_db[item_data.user_id].append(item.dict())
     return item
 
 @api_router.get("/wardrobe/{user_id}", response_model=List[WardrobeItem])
 async def get_wardrobe(user_id: str, category: Optional[str] = None):
-    query = {"user_id": user_id}
+    items = wardrobe_db.get(user_id, [])
     if category and category != "All":
-        query["category"] = category
-    items = await db.wardrobe.find(query).to_list(1000)
+        items = [i for i in items if i.get("category") == category]
     return [WardrobeItem(**item) for item in items]
 
 @api_router.get("/wardrobe/item/{item_id}", response_model=WardrobeItem)
 async def get_wardrobe_item(item_id: str):
-    item = await db.wardrobe.find_one({"id": item_id})
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return WardrobeItem(**item)
+    for user_items in wardrobe_db.values():
+        for item in user_items:
+            if item.get("id") == item_id:
+                return WardrobeItem(**item)
+    raise HTTPException(status_code=404, detail="Item not found")
 
 @api_router.put("/wardrobe/{item_id}", response_model=WardrobeItem)
 async def update_wardrobe_item(item_id: str, item_update: WardrobeItemUpdate):
     update_data = {k: v for k, v in item_update.dict().items() if v is not None}
-    if update_data:
-        await db.wardrobe.update_one({"id": item_id}, {"$set": update_data})
-    item = await db.wardrobe.find_one({"id": item_id})
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return WardrobeItem(**item)
+    for user_items in wardrobe_db.values():
+        for item in user_items:
+            if item.get("id") == item_id:
+                item.update(update_data)
+                return WardrobeItem(**item)
+    raise HTTPException(status_code=404, detail="Item not found")
 
 @api_router.delete("/wardrobe/{item_id}")
 async def delete_wardrobe_item(item_id: str):
-    result = await db.wardrobe.delete_one({"id": item_id})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return {"message": "Item deleted successfully"}
+    for user_id, user_items in wardrobe_db.items():
+        for i, item in enumerate(user_items):
+            if item.get("id") == item_id:
+                wardrobe_db[user_id].pop(i)
+                return {"message": "Item deleted successfully"}
+    raise HTTPException(status_code=404, detail="Item not found")
 
 # Swipe Routes
 @api_router.post("/swipes", response_model=SwipeRecord)
 async def create_swipe(swipe_data: SwipeCreate):
     swipe = SwipeRecord(**swipe_data.dict())
-    await db.swipes.insert_one(swipe.dict())
-    
+    if swipe_data.user_id not in swipes_db:
+        swipes_db[swipe_data.user_id] = []
+    swipes_db[swipe_data.user_id].append(swipe.dict())
+
     # Update user's style DNA based on swipe
-    user = await db.users.find_one({"id": swipe_data.user_id})
+    user = users_db.get(swipe_data.user_id)
     if user:
         style_dna = user.get("style_dna", {})
         category = swipe_data.style_category
@@ -490,18 +494,16 @@ async def create_swipe(swipe_data: SwipeCreate):
                 style_dna[category] = min(1.0, style_dna[category] + 0.1)
             elif swipe_data.action == "dislike":
                 style_dna[category] = max(0.0, style_dna[category] - 0.03)
-        
+
         swipes_count = user.get("swipes_count", 0) + 1
-        await db.users.update_one(
-            {"id": swipe_data.user_id},
-            {"$set": {"style_dna": style_dna, "swipes_count": swipes_count}}
-        )
-    
+        users_db[swipe_data.user_id]["style_dna"] = style_dna
+        users_db[swipe_data.user_id]["swipes_count"] = swipes_count
+
     return swipe
 
 @api_router.get("/swipes/{user_id}", response_model=List[SwipeRecord])
 async def get_swipes(user_id: str):
-    swipes = await db.swipes.find({"user_id": user_id}).to_list(1000)
+    swipes = swipes_db.get(user_id, [])
     return [SwipeRecord(**swipe) for swipe in swipes]
 
 # Outfits Routes
@@ -646,11 +648,11 @@ async def chat_with_stylist(request: ChatRequest):
         user_data = None
         wardrobe = None
 
-        user = await db.users.find_one({"id": request.user_id})
+        user = users_db.get(request.user_id)
         if user:
             user_data = user
 
-        wardrobe_items = await db.wardrobe.find({"user_id": request.user_id}).to_list(50)
+        wardrobe_items = wardrobe_db.get(request.user_id, [])
         if wardrobe_items:
             wardrobe = wardrobe_items
 
@@ -735,7 +737,7 @@ async def get_weather(lat: float = 19.0760, lon: float = 72.8777):  # Default: M
 async def get_outfit_suggestion(request: OutfitSuggestionRequest):
     try:
         # Get user's wardrobe
-        wardrobe_items = await db.wardrobe.find({"user_id": request.user_id}).to_list(100)
+        wardrobe_items = wardrobe_db.get(request.user_id, [])
 
         if not wardrobe_items:
             return {
@@ -745,7 +747,7 @@ async def get_outfit_suggestion(request: OutfitSuggestionRequest):
             }
 
         # Get user for style preferences
-        user = await db.users.find_one({"id": request.user_id})
+        user = users_db.get(request.user_id)
         style_dna = user.get("style_dna", {}) if user else {}
         body_analysis = user.get("body_analysis") if user else None
 
@@ -862,7 +864,7 @@ async def get_products(min_price: int = 0, max_price: int = 100000):
 
 @api_router.get("/wardrobe-gaps/{user_id}")
 async def get_wardrobe_gaps(user_id: str):
-    wardrobe_items = await db.wardrobe.find({"user_id": user_id}).to_list(100)
+    wardrobe_items = wardrobe_db.get(user_id, [])
     
     categories = {"Tops": 0, "Bottoms": 0, "Dresses": 0, "Outerwear": 0, "Shoes": 0, "Accessories": 0}
     for item in wardrobe_items:
