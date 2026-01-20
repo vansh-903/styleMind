@@ -129,7 +129,15 @@ export default function TodayScreen() {
             <Text style={styles.title}>Today</Text>
             <Text style={styles.subtitle}>{dayName}</Text>
           </View>
-          <Text style={styles.date}>{dateStr}</Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={styles.chatButton}
+              onPress={() => router.push('/chat')}
+            >
+              <Ionicons name="chatbubble-ellipses" size={22} color={COLORS.primary} />
+            </TouchableOpacity>
+            <Text style={styles.date}>{dateStr}</Text>
+          </View>
         </View>
 
         {/* Weather Card */}
@@ -266,6 +274,18 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
+  },
+  headerRight: {
+    alignItems: 'flex-end',
+    gap: SPACING.xs,
+  },
+  chatButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(147, 51, 234, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: 28,

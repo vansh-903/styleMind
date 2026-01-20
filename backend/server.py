@@ -14,6 +14,7 @@ import base64
 
 # Import Gemini service
 from gemini_service import get_gemini_service, GeminiService
+from chat_service import get_chat_service, ChatService
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -142,6 +143,17 @@ class OutfitSuggestionRequest(BaseModel):
     user_id: str
     occasion: str  # work, casual, date, party
     weather: Optional[Dict[str, Any]] = None
+
+class ChatRequest(BaseModel):
+    user_id: str
+    message: str
+
+class ChatResponse(BaseModel):
+    success: bool
+    response: str
+    timestamp: Optional[str] = None
+    message_count: Optional[int] = None
+    error: Optional[str] = None
 
 # ==================== MOCK DATA ====================
 
@@ -610,6 +622,62 @@ async def analyze_body(request: AnalyzeBodyRequest):
             ],
             "error": str(e)
         }
+
+# ==================== CHAT ROUTES ====================
+
+@api_router.post("/chat", response_model=ChatResponse)
+async def chat_with_stylist(request: ChatRequest):
+    """Chat with AI Fashion Stylist using LangChain."""
+    if not GEMINI_API_KEY:
+        return ChatResponse(
+            success=False,
+            response="AI stylist is not configured. Please set up the API key.",
+            error="GEMINI_API_KEY not set"
+        )
+
+    try:
+        # Get user data and wardrobe for context
+        user_data = None
+        wardrobe = None
+
+        user = await db.users.find_one({"id": request.user_id})
+        if user:
+            user_data = user
+
+        wardrobe_items = await db.wardrobe.find({"user_id": request.user_id}).to_list(50)
+        if wardrobe_items:
+            wardrobe = wardrobe_items
+
+        # Get chat service and send message
+        chat_service = get_chat_service(GEMINI_API_KEY)
+        result = await chat_service.chat(
+            user_id=request.user_id,
+            message=request.message,
+            user_data=user_data,
+            wardrobe=wardrobe
+        )
+
+        return ChatResponse(**result)
+
+    except Exception as e:
+        logger.error(f"Chat error: {str(e)}")
+        return ChatResponse(
+            success=False,
+            response="I'm having trouble right now. Please try again! 💫",
+            error=str(e)
+        )
+
+@api_router.delete("/chat/{user_id}")
+async def clear_chat_history(user_id: str):
+    """Clear chat history for a user."""
+    try:
+        if GEMINI_API_KEY:
+            chat_service = get_chat_service(GEMINI_API_KEY)
+            chat_service.clear_conversation(user_id)
+        return {"success": True, "message": "Chat history cleared"}
+    except Exception as e:
+        logger.error(f"Clear chat error: {str(e)}")
+        return {"success": False, "error": str(e)}
 
 # Weather Route (using Open-Meteo - free, no API key needed)
 @api_router.get("/weather")

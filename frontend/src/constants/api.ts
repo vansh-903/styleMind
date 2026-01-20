@@ -42,4 +42,8 @@ export const API_ENDPOINTS = {
   // Products
   getProducts: `${API_BASE_URL}/products`,
   getWardrobeGaps: (userId: string) => `${API_BASE_URL}/wardrobe-gaps/${userId}`,
+
+  // Chat
+  chat: `${API_BASE_URL}/chat`,
+  clearChat: (userId: string) => `${API_BASE_URL}/chat/${userId}`,
 };
