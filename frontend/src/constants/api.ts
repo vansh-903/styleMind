@@ -1,12 +1,11 @@
 // API configuration
-// In development, use localhost. In production, use relative URL for Kubernetes routing.
-const isDev = __DEV__ || process.env.NODE_ENV === 'development';
+// Production URL - Railway deployment
+const PROD_API_URL = 'https://stylemind-production.up.railway.app/api';
 
-// Change this to your computer's local IP if testing on physical device
-const LOCAL_API_URL = 'http://192.168.1.105:5000/api';
-const PROD_API_URL = '/api';
+// Local development URL (uncomment to test locally)
+// const LOCAL_API_URL = 'http://192.168.1.105:5000/api';
 
-export const API_BASE_URL = isDev ? LOCAL_API_URL : PROD_API_URL;
+export const API_BASE_URL = PROD_API_URL;
 
 export const API_ENDPOINTS = {
   // Users
