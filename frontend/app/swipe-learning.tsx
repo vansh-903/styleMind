@@ -79,12 +79,11 @@ export default function SwipeLearningScreen() {
   });
 
   const handleSwipe = useCallback(async (action: 'like' | 'dislike' | 'superlike') => {
-    if (!currentOutfit) return;
+    const outfit = outfits[currentIndex];
+    if (!outfit) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const outfit = outfits[currentIndex];
-    
     // Update local state
     updateStyleDNA(outfit.style_category || outfit.style, action);
     incrementSwipes();
@@ -102,12 +101,12 @@ export default function SwipeLearningScreen() {
         console.error('Error recording swipe:', error);
       }
     }
-    
+
     // Animate card off screen
-    const toValue = action === 'dislike' ? -width * 1.5 : 
-                    action === 'superlike' ? { x: 0, y: -height } : 
+    const toValue = action === 'dislike' ? -width * 1.5 :
+                    action === 'superlike' ? { x: 0, y: -height } :
                     width * 1.5;
-    
+
     Animated.spring(position, {
       toValue: typeof toValue === 'number' ? { x: toValue, y: 0 } : toValue,
       useNativeDriver: true,
@@ -115,22 +114,25 @@ export default function SwipeLearningScreen() {
       bounciness: 5,
     }).start(() => {
       position.setValue({ x: 0, y: 0 });
-      
+
       if (currentIndex >= outfits.length - 1) {
         router.replace('/setup-choice');
       } else {
         setCurrentIndex(prev => prev + 1);
       }
     });
-  }, [currentIndex, userId]);
+  }, [currentIndex, userId, outfits, position, updateStyleDNA, incrementSwipes]);
 
   // Keep ref updated with latest handleSwipe
   useEffect(() => {
     handleSwipeRef.current = handleSwipe;
   }, [handleSwipe]);
 
-  const panResponder = useRef(
-    PanResponder.create({
+  // Create panResponder with refs to avoid stale closures
+  const panResponderRef = useRef<ReturnType<typeof PanResponder.create> | null>(null);
+
+  if (!panResponderRef.current) {
+    panResponderRef.current = PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gestureState) => {
         return Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5;
@@ -167,8 +169,10 @@ export default function SwipeLearningScreen() {
         }
         setSwipeDirection(null);
       },
-    })
-  ).current;
+    });
+  }
+
+  const panResponder = panResponderRef.current;
 
   const progress = outfits.length > 0 ? ((currentIndex) / outfits.length) * 100 : 0;
 

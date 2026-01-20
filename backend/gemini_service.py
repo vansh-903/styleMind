@@ -80,22 +80,38 @@ class GeminiService:
         """
         image_part = self._prepare_image(image_base64)
 
-        prompt = """Analyze this clothing item image and provide detailed fashion attributes.
+        prompt = """You are an expert fashion analyst. Analyze this clothing item image and provide detailed attributes.
 
-You must respond with ONLY valid JSON in this exact format:
+CATEGORY GUIDELINES:
+- Tops: T-shirts, shirts, blouses, kurtas, kurtis, crop tops, tank tops, sweaters, hoodies
+- Bottoms: Jeans, trousers, pants, shorts, skirts, palazzos, salwars, leggings
+- Dresses: One-piece dresses, gowns, jumpsuits, rompers, sarees, lehengas, anarkalis
+- Outerwear: Jackets, coats, blazers, cardigans, shrugs, dupattas
+- Shoes: Sneakers, heels, flats, boots, sandals, juttis, kolhapuris, loafers
+- Accessories: Bags, jewelry, watches, scarves, belts, hats, sunglasses
+
+COLOR ANALYSIS: Be specific (e.g., "Navy Blue", "Burgundy", "Olive Green", "Coral Pink")
+
+OCCASION MAPPING:
+- Casual: Everyday wear, relaxed outings
+- Work: Office appropriate, professional settings
+- Party: Nightlife, celebrations, events
+- Date: Romantic outings, dinner dates
+- Formal: Weddings, ceremonies, black-tie events
+
+Respond with ONLY valid JSON:
 {
     "category": "Tops|Bottoms|Dresses|Outerwear|Shoes|Accessories",
-    "subcategory": "specific type like T-Shirt, Jeans, Kurta, Saree, etc.",
-    "colors": ["primary color", "secondary color if any"],
-    "pattern": "Solid|Striped|Floral|Plaid|Printed|Embroidered",
-    "occasions": ["Casual", "Work", "Party", "Date", "Formal"],
-    "style_tags": ["minimalist", "bohemian", "streetwear", "ethnic", "classic"],
-    "seasonality": ["Spring", "Summer", "Fall", "Winter", "All-Season"],
+    "subcategory": "Specific type (e.g., Polo Shirt, Skinny Jeans, Kurta, Sneakers)",
+    "colors": ["Primary color", "Secondary color if visible"],
+    "pattern": "Solid|Striped|Floral|Plaid|Checked|Printed|Embroidered|Abstract|Animal Print|Geometric",
+    "occasions": ["List all suitable occasions from: Casual, Work, Party, Date, Formal"],
+    "style_tags": ["2-4 tags from: minimalist, bohemian, streetwear, ethnic, classic, edgy, preppy, sporty, romantic, vintage"],
+    "seasonality": ["Suitable seasons: Spring, Summer, Fall, Winter, All-Season"],
     "confidence": 0.95
 }
 
-Be specific with colors (e.g., "Navy Blue" not just "Blue").
-Recognize Indian garments: kurta, kurti, saree, lehenga, salwar, dupatta, juttis, etc."""
+IMPORTANT: Recognize Indian garments accurately - kurta, kurti, saree, lehenga, salwar kameez, churidar, dupatta, sherwani, juttis, kolhapuris, mojaris."""
 
         try:
             response = self.client.models.generate_content(
@@ -133,37 +149,60 @@ Recognize Indian garments: kurta, kurti, saree, lehenga, salwar, dupatta, juttis
         """
         image_part = self._prepare_image(image_base64)
 
-        prompt = """Analyze this photo for personalized fashion recommendations.
+        prompt = """You are an expert fashion stylist and image consultant. Analyze this person's photo to provide personalized fashion recommendations.
 
-Provide a positive, empowering analysis. Respond with ONLY valid JSON:
+IMPORTANT ANALYSIS GUIDELINES:
+1. BODY TYPE: Look at shoulder-to-hip ratio, waist definition, and overall proportions
+   - Hourglass: Balanced shoulders and hips with defined waist
+   - Pear: Hips wider than shoulders
+   - Apple: Wider midsection, slimmer legs
+   - Rectangle: Similar measurements throughout
+   - Inverted Triangle: Broader shoulders than hips
+   - Athletic: Muscular build with less waist definition
+
+2. SKIN TONE: Analyze visible skin areas for:
+   - Depth: Fair, Light, Medium, Tan, Deep
+   - Undertone: Look at veins (blue=cool, green=warm, both=neutral)
+
+3. FACE SHAPE: Analyze facial structure for accessory recommendations
+
+Provide a POSITIVE, EMPOWERING analysis. Focus on what flatters, not flaws.
+
+Respond with ONLY valid JSON in this EXACT format:
 {
     "body_type": {
-        "type": "Rectangle|Hourglass|Pear|Apple|Inverted Triangle|Athletic",
-        "description": "Brief positive description",
-        "recommendations": ["flattering style 1", "flattering style 2", "flattering style 3"]
+        "type": "Hourglass|Pear|Apple|Rectangle|Inverted Triangle|Athletic",
+        "description": "A positive 1-2 sentence description highlighting their natural assets",
+        "recommendations": [
+            "Specific flattering style recommendation 1",
+            "Specific flattering style recommendation 2",
+            "Specific flattering style recommendation 3",
+            "Specific flattering style recommendation 4"
+        ]
     },
     "skin_tone": {
         "type": "Fair|Light|Medium|Tan|Deep",
         "undertone": "warm|cool|neutral",
-        "best_colors": ["color1", "color2", "color3", "color4", "color5"],
-        "colors_to_avoid": ["color1", "color2"],
+        "best_colors": ["Specific color 1", "Specific color 2", "Specific color 3", "Specific color 4", "Specific color 5"],
+        "avoid_colors": ["Color to avoid 1", "Color to avoid 2"],
         "metal_recommendation": "Gold|Silver|Rose Gold|Both"
     },
     "face_shape": {
         "type": "Oval|Round|Square|Heart|Oblong|Diamond",
-        "description": "Brief description",
-        "flattering_necklines": ["V-neck", "Scoop", etc.],
-        "flattering_accessories": ["earring style", "glasses style"]
+        "description": "Brief positive description of their face shape",
+        "flattering_necklines": ["Neckline 1", "Neckline 2", "Neckline 3"],
+        "flattering_accessories": ["Accessory style 1", "Accessory style 2"]
     },
     "overall_recommendations": [
-        "Personalized tip 1",
-        "Personalized tip 2",
-        "Personalized tip 3"
+        "Personalized styling tip 1 based on their unique features",
+        "Personalized styling tip 2",
+        "Personalized styling tip 3"
     ],
     "confidence": 0.85
 }
 
-Be encouraging and positive. Focus on what WILL look great."""
+Be specific with colors (e.g., "Emerald Green" not just "Green", "Coral" not just "Orange").
+Consider Indian fashion context - include recommendations for ethnic wear when relevant."""
 
         try:
             response = self.client.models.generate_content(
@@ -183,24 +222,28 @@ Be encouraging and positive. Focus on what WILL look great."""
             logger.error(f"Body analysis failed: {e}")
             return {
                 "body_type": {
-                    "type": "Unknown",
-                    "description": "Unable to analyze",
-                    "recommendations": ["Try uploading a clearer photo"]
+                    "type": "Rectangle",
+                    "description": "Balanced proportions that work with many styles",
+                    "recommendations": ["Belted dresses to define waist", "Peplum tops", "High-waisted bottoms", "Layered outfits"]
                 },
                 "skin_tone": {
                     "type": "Medium",
                     "undertone": "neutral",
-                    "best_colors": ["Navy", "White", "Black", "Grey"],
-                    "colors_to_avoid": [],
+                    "best_colors": ["Navy Blue", "Emerald Green", "Burgundy", "Teal", "Mustard"],
+                    "avoid_colors": ["Neon Yellow", "Washed-out Pastels"],
                     "metal_recommendation": "Both"
                 },
                 "face_shape": {
                     "type": "Oval",
-                    "description": "Versatile shape",
-                    "flattering_necklines": ["Most styles work well"],
-                    "flattering_accessories": ["Most styles complement"]
+                    "description": "Versatile face shape that suits most styles",
+                    "flattering_necklines": ["V-neck", "Scoop neck", "Boat neck"],
+                    "flattering_accessories": ["Most earring styles", "Classic frames"]
                 },
-                "overall_recommendations": ["Upload a clearer photo for personalized recommendations"],
+                "overall_recommendations": [
+                    "Try uploading a clearer full-body photo for personalized recommendations",
+                    "Good lighting helps with accurate skin tone analysis",
+                    "Stand naturally for best body type assessment"
+                ],
                 "confidence": 0.0,
                 "error": str(e)
             }

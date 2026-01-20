@@ -558,19 +558,25 @@ async def analyze_body(request: AnalyzeBodyRequest):
         return {
             "body_type": {
                 "type": "Rectangle",
-                "description": "Balanced proportions",
-                "recommendations": ["Most styles work well"]
+                "description": "Balanced proportions that suit many styles",
+                "recommendations": ["Belted dresses", "Peplum tops", "High-waisted bottoms", "Layered looks"]
             },
             "skin_tone": {
                 "type": "Medium",
                 "undertone": "neutral",
-                "best_colors": ["Navy", "White", "Grey"],
-                "colors_to_avoid": []
+                "best_colors": ["Navy Blue", "Emerald Green", "Burgundy", "Teal", "White"],
+                "avoid_colors": ["Neon colors", "Washed-out pastels"]
             },
             "face_shape": {
                 "type": "Oval",
-                "description": "Versatile shape"
+                "description": "Versatile face shape that suits most styles",
+                "flattering_necklines": ["V-neck", "Scoop neck", "Boat neck"],
+                "flattering_accessories": ["Most earring styles", "Classic frames"]
             },
+            "overall_recommendations": [
+                "Configure GEMINI_API_KEY for personalized recommendations",
+                "These are default suggestions"
+            ],
             "error": "AI not configured - set GEMINI_API_KEY"
         }
 
@@ -583,19 +589,25 @@ async def analyze_body(request: AnalyzeBodyRequest):
         return {
             "body_type": {
                 "type": "Rectangle",
-                "description": "Balanced proportions",
-                "recommendations": ["Belted dresses", "Peplum tops", "High-waisted bottoms"]
+                "description": "Balanced proportions that work with many styles",
+                "recommendations": ["Belted dresses to define waist", "Peplum tops", "High-waisted bottoms", "Layered outfits"]
             },
             "skin_tone": {
                 "type": "Medium",
                 "undertone": "warm",
-                "best_colors": ["Coral", "Gold", "Olive", "Terracotta"],
-                "colors_to_avoid": ["Neon", "Pastel Pink"]
+                "best_colors": ["Coral", "Gold", "Olive Green", "Terracotta", "Teal"],
+                "avoid_colors": ["Neon Yellow", "Washed-out Pastels"]
             },
             "face_shape": {
                 "type": "Oval",
-                "description": "Versatile - most styles work well"
+                "description": "Versatile face shape - most styles work well",
+                "flattering_necklines": ["V-neck", "Scoop neck", "Boat neck"],
+                "flattering_accessories": ["Most earring styles", "Classic frames"]
             },
+            "overall_recommendations": [
+                "Please try again with a clearer photo",
+                "Good lighting helps with accurate analysis"
+            ],
             "error": str(e)
         }
 

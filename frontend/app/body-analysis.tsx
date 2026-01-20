@@ -293,7 +293,7 @@ export default function BodyAnalysisScreen() {
           </View>
           <Text style={styles.resultSubtitle}>Avoid:</Text>
           <View style={styles.colorChips}>
-            {results?.skin_tone?.avoid_colors?.map((color: string, i: number) => (
+            {(results?.skin_tone?.avoid_colors || results?.skin_tone?.colors_to_avoid)?.map((color: string, i: number) => (
               <View key={i} style={[styles.colorChip, styles.colorChipAvoid]}>
                 <Text style={styles.colorChipTextAvoid}>{color}</Text>
               </View>
