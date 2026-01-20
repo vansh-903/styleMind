@@ -27,8 +27,8 @@ export default function ProfileScreen() {
       'Are you sure you want to sign out?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Sign Out', 
+        {
+          text: 'Sign Out',
           style: 'destructive',
           onPress: () => {
             reset();
@@ -39,13 +39,37 @@ export default function ProfileScreen() {
     );
   };
 
+  const showComingSoon = (feature: string) => {
+    Alert.alert(
+      'Coming Soon',
+      `${feature} will be available in a future update. Stay tuned!`,
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleSettings = () => {
+    showComingSoon('Settings');
+  };
+
+  const handleSeeFullAnalysis = () => {
+    if (Object.keys(styleDNA).length > 0) {
+      router.push('/body-analysis');
+    } else {
+      Alert.alert(
+        'No Analysis Yet',
+        'Complete the style quiz by swiping on outfits to build your Style DNA.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
   const menuItems = [
     { icon: 'camera', label: 'Update Body Analysis', onPress: () => router.push('/body-analysis') },
-    { icon: 'help-circle', label: 'Style Quiz', onPress: () => {} },
-    { icon: 'bar-chart', label: 'Wardrobe Insights', onPress: () => {} },
-    { icon: 'people', label: 'Invite Friends', onPress: () => {} },
-    { icon: 'help', label: 'Help & Support', onPress: () => {} },
-    { icon: 'information-circle', label: 'About StyleMind', onPress: () => {} },
+    { icon: 'help-circle', label: 'Style Quiz', onPress: () => showComingSoon('Style Quiz') },
+    { icon: 'bar-chart', label: 'Wardrobe Insights', onPress: () => showComingSoon('Wardrobe Insights') },
+    { icon: 'people', label: 'Invite Friends', onPress: () => showComingSoon('Invite Friends') },
+    { icon: 'help', label: 'Help & Support', onPress: () => showComingSoon('Help & Support') },
+    { icon: 'information-circle', label: 'About StyleMind', onPress: () => showComingSoon('About StyleMind') },
   ];
 
   return (
@@ -53,9 +77,9 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.title}>Profile</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.settingsButton}
-            onPress={() => {}}
+            onPress={handleSettings}
           >
             <Ionicons name="settings-outline" size={22} color={COLORS.textPrimary} />
           </TouchableOpacity>
@@ -77,7 +101,7 @@ export default function ProfileScreen() {
         <View style={styles.styleDNACard}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>Style DNA</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={handleSeeFullAnalysis}>
               <Text style={styles.seeAllText}>See Full Analysis</Text>
             </TouchableOpacity>
           </View>
@@ -107,7 +131,7 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statNumber}>
-              {wardrobeItems.length > 0 ? Math.round(Math.random() * 30 + 70) : 0}%
+              {wardrobeItems.length > 0 ? Math.min(100, Math.round(70 + wardrobeItems.length * 2)) : 0}%
             </Text>
             <Text style={styles.statLabel}>Usage</Text>
           </View>

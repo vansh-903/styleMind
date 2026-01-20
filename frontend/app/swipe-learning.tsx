@@ -29,6 +29,7 @@ export default function SwipeLearningScreen() {
   const [swipeDirection, setSwipeDirection] = useState<string | null>(null);
   const position = useRef(new Animated.ValueXY()).current;
   const { userId, gender, incrementSwipes, updateStyleDNA } = useAppStore();
+  const handleSwipeRef = useRef<(action: 'like' | 'dislike' | 'superlike') => void>(() => {});
 
   useEffect(() => {
     fetchOutfits();
@@ -52,10 +53,6 @@ export default function SwipeLearningScreen() {
 
   const currentOutfit = outfits[currentIndex];
   const nextOutfit = outfits[currentIndex + 1];
-  const { userId, incrementSwipes, updateStyleDNA } = useAppStore();
-
-  const currentOutfit = OUTFITS[currentIndex];
-  const nextOutfit = OUTFITS[currentIndex + 1];
 
   const rotation = position.x.interpolate({
     inputRange: [-width / 2, 0, width / 2],
@@ -82,14 +79,16 @@ export default function SwipeLearningScreen() {
   });
 
   const handleSwipe = useCallback(async (action: 'like' | 'dislike' | 'superlike') => {
+    if (!currentOutfit) return;
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
-    const outfit = OUTFITS[currentIndex];
+
+    const outfit = outfits[currentIndex];
     
     // Update local state
-    updateStyleDNA(outfit.style, action);
+    updateStyleDNA(outfit.style_category || outfit.style, action);
     incrementSwipes();
-    
+
     // Send to backend
     if (userId) {
       try {
@@ -97,7 +96,7 @@ export default function SwipeLearningScreen() {
           user_id: userId,
           outfit_id: outfit.id,
           action: action,
-          style_category: outfit.style,
+          style_category: outfit.style_category || outfit.style,
         });
       } catch (error) {
         console.error('Error recording swipe:', error);
@@ -117,7 +116,7 @@ export default function SwipeLearningScreen() {
     }).start(() => {
       position.setValue({ x: 0, y: 0 });
       
-      if (currentIndex >= OUTFITS.length - 1) {
+      if (currentIndex >= outfits.length - 1) {
         router.replace('/setup-choice');
       } else {
         setCurrentIndex(prev => prev + 1);
@@ -125,24 +124,40 @@ export default function SwipeLearningScreen() {
     });
   }, [currentIndex, userId]);
 
+  // Keep ref updated with latest handleSwipe
+  useEffect(() => {
+    handleSwipeRef.current = handleSwipe;
+  }, [handleSwipe]);
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5;
+      },
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponderCapture: () => false,
+      onPanResponderGrant: () => {
+        position.stopAnimation();
+        position.setOffset({ x: 0, y: 0 });
+        position.setValue({ x: 0, y: 0 });
+      },
       onPanResponderMove: (_, gesture) => {
         position.setValue({ x: gesture.dx, y: gesture.dy });
-        
+
         if (gesture.dx > 50) setSwipeDirection('like');
         else if (gesture.dx < -50) setSwipeDirection('dislike');
         else if (gesture.dy < -50) setSwipeDirection('superlike');
         else setSwipeDirection(null);
       },
       onPanResponderRelease: (_, gesture) => {
+        position.flattenOffset();
         if (gesture.dx > SWIPE_THRESHOLD) {
-          handleSwipe('like');
+          handleSwipeRef.current('like');
         } else if (gesture.dx < -SWIPE_THRESHOLD) {
-          handleSwipe('dislike');
+          handleSwipeRef.current('dislike');
         } else if (gesture.dy < -SWIPE_THRESHOLD) {
-          handleSwipe('superlike');
+          handleSwipeRef.current('superlike');
         } else {
           Animated.spring(position, {
             toValue: { x: 0, y: 0 },
@@ -155,19 +170,43 @@ export default function SwipeLearningScreen() {
     })
   ).current;
 
-  const progress = ((currentIndex) / OUTFITS.length) * 100;
+  const progress = outfits.length > 0 ? ((currentIndex) / outfits.length) * 100 : 0;
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading outfits...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (outfits.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>No outfits available</Text>
+          <TouchableOpacity style={styles.skipButton} onPress={() => router.replace('/setup-choice')}>
+            <Text style={styles.skipText}>Continue anyway</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Let's learn your style</Text>
-        <Text style={styles.subtitle}>Swipe through {OUTFITS.length} outfits to get started</Text>
+        <Text style={styles.subtitle}>Swipe through {outfits.length} outfits to get started</Text>
         
         <View style={styles.progressContainer}>
           <View style={styles.progressBar}>
             <View style={[styles.progressFill, { width: `${progress}%` }]} />
           </View>
-          <Text style={styles.progressText}>{currentIndex}/{OUTFITS.length}</Text>
+          <Text style={styles.progressText}>{currentIndex}/{outfits.length}</Text>
         </View>
       </View>
 
@@ -175,7 +214,7 @@ export default function SwipeLearningScreen() {
         {/* Next Card (behind) */}
         {nextOutfit && (
           <View style={[styles.card, styles.nextCard]}>
-            <Image source={{ uri: nextOutfit.image }} style={styles.cardImage} />
+            <Image source={{ uri: nextOutfit.image_url }} style={styles.cardImage} />
           </View>
         )}
 
@@ -194,7 +233,7 @@ export default function SwipeLearningScreen() {
               },
             ]}
           >
-            <Image source={{ uri: currentOutfit.image }} style={styles.cardImage} />
+            <Image source={{ uri: currentOutfit.image_url }} style={styles.cardImage} />
             
             {/* Overlays */}
             <Animated.View style={[styles.overlay, styles.likeOverlay, { opacity: likeOpacity }]}>
@@ -210,7 +249,7 @@ export default function SwipeLearningScreen() {
             <View style={styles.cardInfo}>
               <Text style={styles.cardTitle}>{currentOutfit.name}</Text>
               <View style={styles.tagsContainer}>
-                {currentOutfit.tags.map((tag, index) => (
+                {currentOutfit.tags?.map((tag: string, index: number) => (
                   <View key={index} style={styles.tag}>
                     <Text style={styles.tagText}>{tag}</Text>
                   </View>
@@ -407,5 +446,15 @@ const styles = StyleSheet.create({
   skipText: {
     fontSize: 14,
     color: COLORS.textMuted,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: SPACING.md,
+    color: COLORS.textSecondary,
+    fontSize: 16,
   },
 });

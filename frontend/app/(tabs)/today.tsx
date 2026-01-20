@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Image,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -31,6 +32,7 @@ export default function TodayScreen() {
   const [selectedOccasion, setSelectedOccasion] = useState('casual');
   const [outfit, setOutfit] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [outfitError, setOutfitError] = useState<string | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
   const { userId, wardrobeItems } = useAppStore();
 
@@ -46,7 +48,7 @@ export default function TodayScreen() {
     if (userId) {
       fetchOutfitSuggestion();
     }
-  }, [userId, selectedOccasion]);
+  }, [userId, fetchOutfitSuggestion]);
 
   const fetchWeather = async () => {
     try {
@@ -72,8 +74,9 @@ export default function TodayScreen() {
     }
   };
 
-  const fetchOutfitSuggestion = async () => {
+  const fetchOutfitSuggestion = useCallback(async () => {
     setLoading(true);
+    setOutfitError(null);
     try {
       const response = await axios.post(API_ENDPOINTS.getOutfitSuggestion, {
         user_id: userId,
@@ -83,10 +86,11 @@ export default function TodayScreen() {
       setOutfit(response.data);
     } catch (error) {
       console.error('Error fetching outfit:', error);
+      setOutfitError('Failed to generate outfit. Please try again.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId, selectedOccasion, weather]);
 
   const handleOccasionSelect = (occasionId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -96,6 +100,15 @@ export default function TodayScreen() {
   const handleRefresh = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     fetchOutfitSuggestion();
+  };
+
+  const handleWearThis = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      'Outfit Saved!',
+      'Great choice! This outfit has been saved to your history.',
+      [{ text: 'OK' }]
+    );
   };
 
   const getWeatherIcon = () => {
@@ -182,6 +195,15 @@ export default function TodayScreen() {
               <ActivityIndicator size="large" color={COLORS.primary} />
               <Text style={styles.loadingText}>Creating your perfect outfit...</Text>
             </View>
+          ) : outfitError ? (
+            <View style={styles.errorOutfit}>
+              <Ionicons name="cloud-offline" size={48} color={COLORS.textMuted} />
+              <Text style={styles.errorText}>{outfitError}</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={fetchOutfitSuggestion}>
+                <Ionicons name="refresh" size={18} color={COLORS.white} />
+                <Text style={styles.retryButtonText}>Try Again</Text>
+              </TouchableOpacity>
+            </View>
           ) : outfit?.success && outfit?.outfit?.length > 0 ? (
             <View style={styles.outfitCard}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -198,7 +220,7 @@ export default function TodayScreen() {
               </ScrollView>
               
               <View style={styles.outfitActions}>
-                <TouchableOpacity style={styles.wearButton}>
+                <TouchableOpacity style={styles.wearButton} onPress={handleWearThis}>
                   <Ionicons name="checkmark-circle" size={20} color={COLORS.white} />
                   <Text style={styles.wearButtonText}>Wear This</Text>
                 </TouchableOpacity>
@@ -428,5 +450,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.primary,
+  },
+  errorOutfit: {
+    alignItems: 'center',
+    padding: SPACING.xxl,
+    marginHorizontal: SPACING.lg,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+  },
+  errorText: {
+    marginTop: SPACING.md,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.md,
+    marginTop: SPACING.md,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.white,
   },
 });

@@ -9,6 +9,8 @@ import {
   Animated,
   PanResponder,
   ActivityIndicator,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,33 +23,67 @@ import { API_ENDPOINTS } from '../../src/constants/api';
 const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 100;
 
+const STYLE_FILTERS = [
+  { id: 'all', label: 'All Styles' },
+  { id: 'minimalist', label: 'Minimalist' },
+  { id: 'casual_chic', label: 'Casual Chic' },
+  { id: 'streetwear', label: 'Streetwear' },
+  { id: 'bohemian', label: 'Bohemian' },
+  { id: 'classic', label: 'Classic' },
+  { id: 'edgy', label: 'Edgy' },
+];
+
 export default function DiscoverScreen() {
   const [outfits, setOutfits] = useState<any[]>([]);
+  const [filteredOutfits, setFilteredOutfits] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showFilter, setShowFilter] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState('all');
   const position = useRef(new Animated.ValueXY()).current;
   const { userId, gender, swipesCount, incrementSwipes, updateStyleDNA } = useAppStore();
+  const handleSwipeRef = useRef<(action: 'like' | 'dislike' | 'superlike') => void>(() => {});
 
   useEffect(() => {
     fetchOutfits();
   }, [gender]);
 
+  useEffect(() => {
+    // Apply filter when outfits or filter changes
+    if (selectedFilter === 'all') {
+      setFilteredOutfits(outfits);
+    } else {
+      setFilteredOutfits(outfits.filter(o => o.style_category === selectedFilter));
+    }
+    setCurrentIndex(0);
+  }, [outfits, selectedFilter]);
+
   const fetchOutfits = async () => {
+    setLoading(true);
+    setError(null);
     try {
       // Pass gender to get gender-appropriate outfits
       const response = await axios.get(API_ENDPOINTS.getOutfits, {
         params: { gender: gender || undefined }
       });
       setOutfits(response.data);
-    } catch (error) {
-      console.error('Error fetching outfits:', error);
+    } catch (err) {
+      console.error('Error fetching outfits:', err);
+      setError('Failed to load styles. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const currentOutfit = outfits[currentIndex];
-  const nextOutfit = outfits[currentIndex + 1];
+  const handleFilterSelect = (filterId: string) => {
+    setSelectedFilter(filterId);
+    setShowFilter(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const currentOutfit = filteredOutfits[currentIndex];
+  const nextOutfit = filteredOutfits[currentIndex + 1];
 
   const rotation = position.x.interpolate({
     inputRange: [-width / 2, 0, width / 2],
@@ -69,12 +105,12 @@ export default function DiscoverScreen() {
 
   const handleSwipe = useCallback(async (action: 'like' | 'dislike' | 'superlike') => {
     if (!currentOutfit) return;
-    
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
+
     updateStyleDNA(currentOutfit.style_category, action);
     incrementSwipes();
-    
+
     if (userId) {
       try {
         await axios.post(API_ENDPOINTS.createSwipe, {
@@ -87,11 +123,11 @@ export default function DiscoverScreen() {
         console.error('Error recording swipe:', error);
       }
     }
-    
-    const toValue = action === 'dislike' ? -width * 1.5 : 
-                    action === 'superlike' ? { x: 0, y: -height } : 
+
+    const toValue = action === 'dislike' ? -width * 1.5 :
+                    action === 'superlike' ? { x: 0, y: -height } :
                     width * 1.5;
-    
+
     Animated.spring(position, {
       toValue: typeof toValue === 'number' ? { x: toValue, y: 0 } : toValue,
       useNativeDriver: true,
@@ -101,21 +137,40 @@ export default function DiscoverScreen() {
       position.setValue({ x: 0, y: 0 });
       setCurrentIndex(prev => prev + 1);
     });
-  }, [currentIndex, currentOutfit, userId]);
+  }, [currentOutfit, userId, position, updateStyleDNA, incrementSwipes]);
+
+  // Keep ref updated with latest handleSwipe
+  useEffect(() => {
+    handleSwipeRef.current = handleSwipe;
+  }, [handleSwipe]);
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onPanResponderMove: (_, gesture) => {
-        position.setValue({ x: gesture.dx, y: gesture.dy });
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only capture if there's significant movement
+        return Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5;
       },
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponderCapture: () => false,
+      onPanResponderGrant: () => {
+        // Stop any ongoing animation when touch starts
+        position.stopAnimation();
+        position.setOffset({ x: 0, y: 0 });
+        position.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event(
+        [null, { dx: position.x, dy: position.y }],
+        { useNativeDriver: false }
+      ),
       onPanResponderRelease: (_, gesture) => {
+        position.flattenOffset();
         if (gesture.dx > SWIPE_THRESHOLD) {
-          handleSwipe('like');
+          handleSwipeRef.current('like');
         } else if (gesture.dx < -SWIPE_THRESHOLD) {
-          handleSwipe('dislike');
+          handleSwipeRef.current('dislike');
         } else if (gesture.dy < -SWIPE_THRESHOLD) {
-          handleSwipe('superlike');
+          handleSwipeRef.current('superlike');
         } else {
           Animated.spring(position, {
             toValue: { x: 0, y: 0 },
@@ -141,7 +196,23 @@ export default function DiscoverScreen() {
     );
   }
 
-  if (currentIndex >= outfits.length) {
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="cloud-offline" size={64} color={COLORS.textMuted} />
+          <Text style={styles.errorTitle}>Oops!</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchOutfits}>
+            <Ionicons name="refresh" size={20} color={COLORS.white} />
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (currentIndex >= filteredOutfits.length) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.emptyContainer}>
@@ -157,8 +228,8 @@ export default function DiscoverScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Discover</Text>
-        <TouchableOpacity style={styles.filterButton}>
-          <Ionicons name="options" size={22} color={COLORS.textPrimary} />
+        <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilter(true)}>
+          <Ionicons name="options" size={22} color={selectedFilter !== 'all' ? COLORS.primary : COLORS.textPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -231,14 +302,14 @@ export default function DiscoverScreen() {
         >
           <Ionicons name="close" size={32} color={COLORS.error} />
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[styles.actionButton, styles.superlikeButton]}
           onPress={() => handleSwipe('superlike')}
         >
           <Ionicons name="star" size={28} color={COLORS.accent} />
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[styles.actionButton, styles.likeButton]}
           onPress={() => handleSwipe('like')}
@@ -246,6 +317,51 @@ export default function DiscoverScreen() {
           <Ionicons name="heart" size={32} color={COLORS.success} />
         </TouchableOpacity>
       </View>
+
+      {/* Filter Modal */}
+      <Modal
+        visible={showFilter}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowFilter(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowFilter(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Filter by Style</Text>
+              <TouchableOpacity onPress={() => setShowFilter(false)}>
+                <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.filterList}>
+              {STYLE_FILTERS.map((filter) => (
+                <TouchableOpacity
+                  key={filter.id}
+                  style={[
+                    styles.filterOption,
+                    selectedFilter === filter.id && styles.filterOptionActive
+                  ]}
+                  onPress={() => handleFilterSelect(filter.id)}
+                >
+                  <Text style={[
+                    styles.filterOptionText,
+                    selectedFilter === filter.id && styles.filterOptionTextActive
+                  ]}>
+                    {filter.label}
+                  </Text>
+                  {selectedFilter === filter.id && (
+                    <Ionicons name="checkmark" size={20} color={COLORS.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -436,5 +552,85 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: SPACING.sm,
     textAlign: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.xl,
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginTop: SPACING.lg,
+  },
+  errorText: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.sm,
+    textAlign: 'center',
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.lg,
+    marginTop: SPACING.xl,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.background,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    paddingBottom: SPACING.xxl,
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  filterList: {
+    paddingHorizontal: SPACING.lg,
+  },
+  filterOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  filterOptionActive: {
+    backgroundColor: 'rgba(147, 51, 234, 0.05)',
+  },
+  filterOptionText: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+  },
+  filterOptionTextActive: {
+    color: COLORS.primary,
+    fontWeight: '600',
   },
 });

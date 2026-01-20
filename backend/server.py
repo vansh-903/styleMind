@@ -11,7 +11,9 @@ import uuid
 from datetime import datetime
 import httpx
 import base64
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+
+# Import Gemini service
+from gemini_service import get_gemini_service, GeminiService
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -21,8 +23,8 @@ mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ.get('DB_NAME', 'stylemind_db')]
 
-# LLM API Key
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
+# Gemini API Key
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', os.environ.get('GOOGLE_AI_API_KEY', ''))
 
 # Create the main app
 app = FastAPI(title="StyleMind API")
@@ -515,107 +517,67 @@ async def get_outfit(outfit_id: str):
             return outfit
     raise HTTPException(status_code=404, detail="Outfit not found")
 
-# AI Analysis Routes
+# AI Analysis Routes - Using Google Gemini
 @api_router.post("/analyze-clothing")
 async def analyze_clothing(request: AnalyzeClothingRequest):
-    try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"clothing_analysis_{uuid.uuid4()}",
-            system_message="""You are a fashion AI expert. Analyze clothing items from images and provide structured data.
-Respond ONLY with valid JSON in this exact format:
-{
-  "category": "Tops|Bottoms|Dresses|Outerwear|Shoes|Accessories",
-  "subcategory": "specific type like T-Shirt, Jeans, Sneakers, etc.",
-  "colors": ["primary color", "secondary color if any"],
-  "pattern": "Solid|Striped|Floral|Plaid|Abstract|Printed",
-  "occasions": ["Casual", "Work", "Party", "Date", "Formal", "Sport"],
-  "confidence": 0.95
-}"""
-        ).with_model("openai", "gpt-4o")
-        
-        image_content = ImageContent(image_base64=request.image_base64)
-        user_message = UserMessage(
-            text="Analyze this clothing item and provide the category, subcategory, colors, pattern, and suitable occasions.",
-            image_contents=[image_content]
-        )
-        
-        response = await chat.send_message(user_message)
-        
-        # Parse the JSON response
-        import json
-        # Clean the response - remove markdown code blocks if present
-        clean_response = response.strip()
-        if clean_response.startswith("```json"):
-            clean_response = clean_response[7:]
-        if clean_response.startswith("```"):
-            clean_response = clean_response[3:]
-        if clean_response.endswith("```"):
-            clean_response = clean_response[:-3]
-        
-        analysis = json.loads(clean_response.strip())
-        return analysis
-        
-    except Exception as e:
-        logger.error(f"Error analyzing clothing: {str(e)}")
-        # Return default analysis if AI fails
+    """Analyze clothing item using Gemini AI."""
+    if not GEMINI_API_KEY:
+        logger.warning("Gemini API key not configured, returning mock data")
         return {
             "category": "Tops",
             "subcategory": "T-Shirt",
             "colors": ["Unknown"],
             "pattern": "Solid",
             "occasions": ["Casual"],
-            "confidence": 0.5,
+            "confidence": 0.0,
+            "error": "AI not configured - set GEMINI_API_KEY"
+        }
+
+    try:
+        gemini = get_gemini_service(GEMINI_API_KEY)
+        result = await gemini.analyze_clothing(request.image_base64)
+        return result
+    except Exception as e:
+        logger.error(f"Error analyzing clothing: {str(e)}")
+        return {
+            "category": "Tops",
+            "subcategory": "T-Shirt",
+            "colors": ["Unknown"],
+            "pattern": "Solid",
+            "occasions": ["Casual"],
+            "confidence": 0.0,
             "error": str(e)
         }
 
+
 @api_router.post("/analyze-body")
 async def analyze_body(request: AnalyzeBodyRequest):
+    """Analyze body type, skin tone using Gemini AI."""
+    if not GEMINI_API_KEY:
+        logger.warning("Gemini API key not configured, returning mock data")
+        return {
+            "body_type": {
+                "type": "Rectangle",
+                "description": "Balanced proportions",
+                "recommendations": ["Most styles work well"]
+            },
+            "skin_tone": {
+                "type": "Medium",
+                "undertone": "neutral",
+                "best_colors": ["Navy", "White", "Grey"],
+                "colors_to_avoid": []
+            },
+            "face_shape": {
+                "type": "Oval",
+                "description": "Versatile shape"
+            },
+            "error": "AI not configured - set GEMINI_API_KEY"
+        }
+
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"body_analysis_{uuid.uuid4()}",
-            system_message="""You are a fashion styling expert. Analyze body type and skin tone from selfie images to provide personalized fashion recommendations.
-Respond ONLY with valid JSON in this exact format:
-{
-  "body_type": {
-    "type": "Rectangle|Hourglass|Pear|Apple|Inverted Triangle",
-    "description": "Brief description of the body type",
-    "recommendations": ["style tip 1", "style tip 2", "style tip 3"]
-  },
-  "skin_tone": {
-    "type": "Fair|Light|Medium|Tan|Deep",
-    "undertone": "warm|cool|neutral",
-    "best_colors": ["color1", "color2", "color3", "color4"],
-    "avoid_colors": ["color1", "color2"]
-  },
-  "face_shape": {
-    "type": "Oval|Round|Square|Heart|Oblong",
-    "description": "Brief styling note"
-  }
-}"""
-        ).with_model("openai", "gpt-4o")
-        
-        image_content = ImageContent(image_base64=request.image_base64)
-        user_message = UserMessage(
-            text="Analyze this person's body type, skin tone with undertone, and face shape. Provide fashion recommendations.",
-            image_contents=[image_content]
-        )
-        
-        response = await chat.send_message(user_message)
-        
-        import json
-        clean_response = response.strip()
-        if clean_response.startswith("```json"):
-            clean_response = clean_response[7:]
-        if clean_response.startswith("```"):
-            clean_response = clean_response[3:]
-        if clean_response.endswith("```"):
-            clean_response = clean_response[:-3]
-        
-        analysis = json.loads(clean_response.strip())
-        return analysis
-        
+        gemini = get_gemini_service(GEMINI_API_KEY)
+        result = await gemini.analyze_body(request.image_base64)
+        return result
     except Exception as e:
         logger.error(f"Error analyzing body: {str(e)}")
         return {
@@ -628,7 +590,7 @@ Respond ONLY with valid JSON in this exact format:
                 "type": "Medium",
                 "undertone": "warm",
                 "best_colors": ["Coral", "Gold", "Olive", "Terracotta"],
-                "avoid_colors": ["Neon", "Pastel Pink"]
+                "colors_to_avoid": ["Neon", "Pastel Pink"]
             },
             "face_shape": {
                 "type": "Oval",
@@ -682,39 +644,83 @@ async def get_weather(lat: float = 19.0760, lon: float = 72.8777):  # Default: M
             "icon": "partly-cloudy"
         }
 
-# Outfit Suggestion Route
+# Outfit Suggestion Route - Enhanced with Gemini AI
 @api_router.post("/outfit-suggestion")
 async def get_outfit_suggestion(request: OutfitSuggestionRequest):
     try:
         # Get user's wardrobe
         wardrobe_items = await db.wardrobe.find({"user_id": request.user_id}).to_list(100)
-        
+
         if not wardrobe_items:
             return {
                 "success": False,
                 "message": "Add items to your wardrobe to get outfit suggestions",
                 "outfit": None
             }
-        
-        # Filter by occasion
+
+        # Get user for style preferences
+        user = await db.users.find_one({"id": request.user_id})
+        style_dna = user.get("style_dna", {}) if user else {}
+        body_analysis = user.get("body_analysis") if user else None
+
+        # Try AI-powered suggestion if Gemini is configured
+        if GEMINI_API_KEY:
+            try:
+                gemini = get_gemini_service(GEMINI_API_KEY)
+                ai_result = await gemini.generate_outfit_suggestion(
+                    wardrobe_items=wardrobe_items,
+                    occasion=request.occasion,
+                    style_preferences=style_dna,
+                    weather=request.weather,
+                    body_analysis=body_analysis
+                )
+
+                if ai_result.get("success") and ai_result.get("outfit"):
+                    # Map AI suggestions back to wardrobe items with images
+                    outfit_with_images = []
+                    wardrobe_map = {item["id"]: item for item in wardrobe_items}
+
+                    for ai_item in ai_result.get("outfit", []):
+                        item_id = ai_item.get("id")
+                        if item_id and item_id in wardrobe_map:
+                            wardrobe_item = wardrobe_map[item_id]
+                            outfit_with_images.append({
+                                "id": item_id,
+                                "type": ai_item.get("type", wardrobe_item.get("category")),
+                                "name": ai_item.get("name", wardrobe_item.get("subcategory")),
+                                "color": wardrobe_item["colors"][0] if wardrobe_item.get("colors") else "Unknown",
+                                "image_base64": wardrobe_item.get("image_base64"),
+                                "styling_note": ai_item.get("styling_note")
+                            })
+
+                    if outfit_with_images:
+                        return {
+                            "success": True,
+                            "occasion": request.occasion,
+                            "outfit": outfit_with_images,
+                            "outfit_name": ai_result.get("outfit_name", "AI Curated Look"),
+                            "styling_tips": ai_result.get("styling_tips", []),
+                            "ai_powered": True
+                        }
+            except Exception as e:
+                logger.warning(f"AI outfit suggestion failed, falling back: {e}")
+
+        # Fallback: Simple outfit selection logic
         occasion_map = {
             "work": ["Work", "Formal"],
             "casual": ["Casual"],
             "date": ["Date", "Party"],
             "party": ["Party", "Date"]
         }
-        
         target_occasions = occasion_map.get(request.occasion, ["Casual"])
-        
-        # Simple outfit selection logic
+
         tops = [item for item in wardrobe_items if item.get("category") in ["Tops", "Dresses"]]
         bottoms = [item for item in wardrobe_items if item.get("category") == "Bottoms"]
         shoes = [item for item in wardrobe_items if item.get("category") == "Shoes"]
-        
+
         outfit_items = []
-        
+
         if tops:
-            # Prefer items that match the occasion
             matching_tops = [t for t in tops if any(occ in t.get("occasions", []) for occ in target_occasions)]
             selected_top = matching_tops[0] if matching_tops else tops[0]
             outfit_items.append({
@@ -724,7 +730,7 @@ async def get_outfit_suggestion(request: OutfitSuggestionRequest):
                 "color": selected_top["colors"][0] if selected_top.get("colors") else "Unknown",
                 "image_base64": selected_top["image_base64"]
             })
-        
+
         if bottoms and tops and tops[0].get("category") != "Dresses":
             matching_bottoms = [b for b in bottoms if any(occ in b.get("occasions", []) for occ in target_occasions)]
             selected_bottom = matching_bottoms[0] if matching_bottoms else bottoms[0]
@@ -735,7 +741,7 @@ async def get_outfit_suggestion(request: OutfitSuggestionRequest):
                 "color": selected_bottom["colors"][0] if selected_bottom.get("colors") else "Unknown",
                 "image_base64": selected_bottom["image_base64"]
             })
-        
+
         if shoes:
             selected_shoes = shoes[0]
             outfit_items.append({
@@ -745,14 +751,15 @@ async def get_outfit_suggestion(request: OutfitSuggestionRequest):
                 "color": selected_shoes["colors"][0] if selected_shoes.get("colors") else "Unknown",
                 "image_base64": selected_shoes["image_base64"]
             })
-        
+
         return {
             "success": True,
             "occasion": request.occasion,
             "outfit": outfit_items,
-            "weather_note": f"Perfect for {request.weather.get('condition', 'today')}" if request.weather else None
+            "weather_note": f"Perfect for {request.weather.get('condition', 'today')}" if request.weather else None,
+            "ai_powered": False
         }
-        
+
     except Exception as e:
         logger.error(f"Outfit suggestion error: {str(e)}")
         return {

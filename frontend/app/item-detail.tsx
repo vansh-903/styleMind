@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -24,11 +24,7 @@ export default function ItemDetailScreen() {
   const [loading, setLoading] = useState(true);
   const { removeWardrobeItem, updateWardrobeItem } = useAppStore();
 
-  useEffect(() => {
-    fetchItem();
-  }, [id]);
-
-  const fetchItem = async () => {
+  const fetchItem = useCallback(async () => {
     try {
       const response = await axios.get(API_ENDPOINTS.getWardrobeItem(id as string));
       setItem(response.data);
@@ -37,7 +33,11 @@ export default function ItemDetailScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchItem();
+  }, [fetchItem]);
 
   const handleToggleFavorite = async () => {
     if (!item) return;
@@ -60,8 +60,8 @@ export default function ItemDetailScreen() {
       'Are you sure you want to remove this item from your wardrobe?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -75,6 +75,15 @@ export default function ItemDetailScreen() {
           }
         },
       ]
+    );
+  };
+
+  const handleCreateOutfit = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      'Coming Soon',
+      'The outfit creator feature will be available in a future update. Stay tuned!',
+      [{ text: 'OK' }]
     );
   };
 
@@ -181,7 +190,7 @@ export default function ItemDetailScreen() {
             </>
           )}
 
-          <TouchableOpacity style={styles.createOutfitButton}>
+          <TouchableOpacity style={styles.createOutfitButton} onPress={handleCreateOutfit}>
             <Ionicons name="sparkles" size={20} color={COLORS.white} />
             <Text style={styles.createOutfitText}>Create Outfit with This</Text>
           </TouchableOpacity>

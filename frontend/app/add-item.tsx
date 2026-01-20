@@ -212,7 +212,7 @@ export default function AddItemScreen() {
             <ActivityIndicator size="large" color={COLORS.primary} />
             <View style={styles.analyzingSteps}>
               <AnalyzingStep label="Category" done={true} />
-              <AnalyzingStep label="Color" done={analyzing} loading={!analyzing} />
+              <AnalyzingStep label="Color" done={!analyzing} loading={analyzing} />
               <AnalyzingStep label="Pattern" done={false} />
               <AnalyzingStep label="Occasion" done={false} />
             </View>
