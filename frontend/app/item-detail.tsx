@@ -78,13 +78,9 @@ export default function ItemDetailScreen() {
     );
   };
 
-  const handleCreateOutfit = () => {
+  const handleTryOn = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      'Coming Soon',
-      'The outfit creator feature will be available in a future update. Stay tuned!',
-      [{ text: 'OK' }]
-    );
+    router.push({ pathname: '/virtual-try-on', params: { itemIds: item.id } });
   };
 
   if (loading) {
@@ -190,9 +186,9 @@ export default function ItemDetailScreen() {
             </>
           )}
 
-          <TouchableOpacity style={styles.createOutfitButton} onPress={handleCreateOutfit}>
+          <TouchableOpacity style={styles.tryOnButton} onPress={handleTryOn}>
             <Ionicons name="sparkles" size={20} color={COLORS.white} />
-            <Text style={styles.createOutfitText}>Create Outfit with This</Text>
+            <Text style={styles.tryOnButtonText}>Virtual Try-On</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -305,7 +301,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textSecondary,
   },
-  createOutfitButton: {
+  tryOnButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -315,7 +311,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     marginTop: SPACING.xl,
   },
-  createOutfitText: {
+  tryOnButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: COLORS.white,

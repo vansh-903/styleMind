@@ -232,11 +232,21 @@ export default function TodayScreen() {
                   <Ionicons name="checkmark-circle" size={20} color={COLORS.white} />
                   <Text style={styles.wearButtonText}>Wear This</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
-                  <Ionicons name="shuffle" size={20} color={COLORS.primary} />
-                  <Text style={styles.refreshButtonText}>Shuffle</Text>
+                <TouchableOpacity
+                  style={styles.tryOnButton}
+                  onPress={() => {
+                    const itemIds = outfit.outfit.map((item: any) => item.id).join(',');
+                    router.push({ pathname: '/virtual-try-on', params: { itemIds } });
+                  }}
+                >
+                  <Ionicons name="sparkles" size={20} color={COLORS.accent} />
+                  <Text style={styles.tryOnButtonText}>Try On</Text>
                 </TouchableOpacity>
               </View>
+              <TouchableOpacity style={styles.shuffleButton} onPress={handleRefresh}>
+                <Ionicons name="shuffle" size={18} color={COLORS.textSecondary} />
+                <Text style={styles.shuffleButtonText}>Shuffle Outfit</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.emptyOutfit}>
@@ -420,22 +430,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.white,
   },
-  refreshButton: {
+  tryOnButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING.sm,
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(78, 205, 196, 0.15)',
     paddingVertical: SPACING.md,
     borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
   },
-  refreshButtonText: {
+  tryOnButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.primary,
+    color: COLORS.accent,
+  },
+  shuffleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.sm,
+    marginTop: SPACING.sm,
+  },
+  shuffleButtonText: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
   },
   outfitLoading: {
     alignItems: 'center',

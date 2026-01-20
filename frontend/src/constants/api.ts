@@ -45,4 +45,7 @@ export const API_ENDPOINTS = {
   // Chat
   chat: `${API_BASE_URL}/chat`,
   clearChat: (userId: string) => `${API_BASE_URL}/chat/${userId}`,
+
+  // Virtual Try-On
+  virtualTryOn: `${API_BASE_URL}/virtual-try-on`,
 };

@@ -448,6 +448,109 @@ Focus on versatile pieces that create the most new outfit combinations."""
                 "error": str(e)
             }
 
+    async def virtual_try_on(
+        self,
+        outfit_items: List[Dict[str, Any]],
+        body_analysis: Optional[Dict[str, Any]] = None,
+        occasion: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate AI visualization description of how an outfit would look on the user.
+
+        Returns personalized styling advice based on body type and the selected outfit.
+        """
+        # Build outfit description
+        outfit_desc = []
+        for item in outfit_items:
+            desc = f"- {item.get('category', 'Item')}: {item.get('subcategory', '')} in {', '.join(item.get('colors', ['unknown color']))}"
+            if item.get('pattern') and item.get('pattern') != 'Solid':
+                desc += f" ({item.get('pattern')} pattern)"
+            outfit_desc.append(desc)
+
+        outfit_text = "\n".join(outfit_desc)
+
+        # Build body context
+        body_context = "No body analysis available - providing general advice."
+        if body_analysis:
+            body_type = body_analysis.get("body_type", {})
+            skin_tone = body_analysis.get("skin_tone", {})
+            body_context = f"""
+Body Type: {body_type.get('type', 'Unknown')} - {body_type.get('description', '')}
+Skin Tone: {skin_tone.get('type', 'Unknown')} with {skin_tone.get('undertone', 'neutral')} undertone
+Best Colors: {', '.join(skin_tone.get('best_colors', [])[:5])}
+Colors to Avoid: {', '.join(skin_tone.get('avoid_colors', [])[:3])}
+"""
+
+        prompt = f"""You are an expert fashion stylist providing a virtual try-on experience.
+Based on the user's body analysis and selected outfit, create a vivid, personalized description of how this outfit would look on them.
+
+OUTFIT SELECTED:
+{outfit_text}
+
+USER'S PROFILE:
+{body_context}
+
+OCCASION: {occasion or 'General wear'}
+
+Provide a response in this JSON format:
+{{
+    "visualization": "A vivid 2-3 sentence description of how this outfit looks on the user, mentioning specific flattering aspects based on their body type",
+    "fit_score": 85,
+    "color_harmony": "Excellent|Good|Fair - brief explanation of how colors work with skin tone",
+    "body_flattery": "How the outfit flatters their specific body type",
+    "styling_tips": [
+        "Specific tip 1 for wearing this outfit",
+        "Specific tip 2",
+        "Accessory suggestion"
+    ],
+    "occasion_verdict": "How appropriate this outfit is for the occasion",
+    "confidence_boost": "An encouraging, body-positive statement about how they'll look"
+}}
+
+Be specific, positive, and personalized. Focus on what works well."""
+
+        try:
+            logger.info("Calling Gemini for virtual try-on visualization...")
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=[prompt],
+                config=types.GenerateContentConfig(
+                    temperature=0.7,
+                )
+            )
+
+            response_text = response.text.strip()
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+            response_text = response_text.strip()
+
+            result = json.loads(response_text)
+            result["success"] = True
+            logger.info(f"Virtual try-on generated, fit_score: {result.get('fit_score')}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Virtual try-on failed: {e}", exc_info=True)
+            return {
+                "success": False,
+                "visualization": "This outfit combination looks great! The pieces work well together for a stylish, put-together look.",
+                "fit_score": 75,
+                "color_harmony": "Good - classic color combination",
+                "body_flattery": "This outfit creates a balanced silhouette",
+                "styling_tips": [
+                    "Ensure proper fit for the most flattering look",
+                    "Add a statement accessory to elevate the outfit",
+                    "Consider the weather when finalizing"
+                ],
+                "occasion_verdict": "Versatile outfit suitable for multiple occasions",
+                "confidence_boost": "You're going to look amazing! Own your style with confidence.",
+                "error": str(e)
+            }
+
 
 # Singleton instance
 _gemini_service: Optional[GeminiService] = None

@@ -160,14 +160,22 @@ export default function WardrobeScreen() {
         />
       )}
 
-      {/* Floating Add Button */}
+      {/* Floating Action Buttons */}
       {filteredItems.length > 0 && (
-        <TouchableOpacity 
-          style={styles.fab}
-          onPress={() => router.push('/add-item')}
-        >
-          <Ionicons name="add" size={28} color={COLORS.white} />
-        </TouchableOpacity>
+        <View style={styles.fabContainer}>
+          <TouchableOpacity
+            style={styles.fabSecondary}
+            onPress={() => router.push('/virtual-try-on')}
+          >
+            <Ionicons name="sparkles" size={22} color={COLORS.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.fab}
+            onPress={() => router.push('/add-item')}
+          >
+            <Ionicons name="add" size={28} color={COLORS.white} />
+          </TouchableOpacity>
+        </View>
       )}
     </SafeAreaView>
   );
@@ -303,10 +311,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.white,
   },
-  fab: {
+  fabContainer: {
     position: 'absolute',
     bottom: 100,
     right: SPACING.lg,
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  fabSecondary: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  fab: {
     width: 56,
     height: 56,
     borderRadius: 28,

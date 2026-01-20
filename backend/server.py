@@ -155,6 +155,11 @@ class ChatResponse(BaseModel):
     message_count: Optional[int] = None
     error: Optional[str] = None
 
+class VirtualTryOnRequest(BaseModel):
+    user_id: str
+    item_ids: List[str]  # List of wardrobe item IDs to try on
+    occasion: Optional[str] = "casual"
+
 # ==================== MOCK DATA ====================
 
 # Women's Outfits
@@ -856,6 +861,75 @@ async def get_outfit_suggestion(request: OutfitSuggestionRequest):
             "outfit": None
         }
 
+# Virtual Try-On Route
+@api_router.post("/virtual-try-on")
+async def virtual_try_on(request: VirtualTryOnRequest):
+    """Generate AI visualization of how selected outfit items would look on the user."""
+    try:
+        # Get user's wardrobe items
+        user_wardrobe = wardrobe_db.get(request.user_id, [])
+        if not user_wardrobe:
+            return {
+                "success": False,
+                "message": "No wardrobe items found. Add items to your wardrobe first.",
+                "visualization": None
+            }
+
+        # Find the selected items by ID
+        selected_items = []
+        wardrobe_map = {item["id"]: item for item in user_wardrobe}
+        for item_id in request.item_ids:
+            if item_id in wardrobe_map:
+                selected_items.append(wardrobe_map[item_id])
+
+        if not selected_items:
+            return {
+                "success": False,
+                "message": "Selected items not found in your wardrobe.",
+                "visualization": None
+            }
+
+        # Get user's body analysis
+        user = users_db.get(request.user_id)
+        body_analysis = user.get("body_analysis") if user else None
+
+        # Generate visualization with Gemini
+        if not GEMINI_API_KEY:
+            return {
+                "success": False,
+                "message": "AI service not configured.",
+                "visualization": None
+            }
+
+        gemini = get_gemini_service(GEMINI_API_KEY)
+        result = await gemini.virtual_try_on(
+            outfit_items=selected_items,
+            body_analysis=body_analysis,
+            occasion=request.occasion
+        )
+
+        # Add outfit info to result
+        result["outfit_items"] = [
+            {
+                "id": item["id"],
+                "category": item.get("category"),
+                "subcategory": item.get("subcategory"),
+                "colors": item.get("colors", []),
+                "image_base64": item.get("image_base64")
+            }
+            for item in selected_items
+        ]
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Virtual try-on error: {str(e)}")
+        return {
+            "success": False,
+            "message": str(e),
+            "visualization": None
+        }
+
 # Products Route
 @api_router.get("/products")
 async def get_products(min_price: int = 0, max_price: int = 100000):
@@ -897,4 +971,5 @@ app.add_middleware(
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    # In-memory storage - nothing to close
+    logger.info("Shutting down StyleMind API")
